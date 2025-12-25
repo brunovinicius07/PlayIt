@@ -1,29 +1,31 @@
 package com.music.services.impl;
 
-import com.music.model.dto.request.MusicRequestDto;
-import com.music.model.dto.response.MusicResponseDto;
-import com.music.model.entity.BlockMusic;
+import com.music.model.dto.request.AddMusicRequest;
+import com.music.model.dto.request.UpdateToneRequest;
+import com.music.model.dto.response.UserMusicDetailResponse;
+import com.music.model.dto.response.UserMusicResponse;
 import com.music.model.entity.Music;
-import com.music.model.exceptions.music.MusicIsPresentException;
-import com.music.model.exceptions.music.MusicNotFoundException;
+import com.music.model.entity.User;
+import com.music.model.entity.UserMusic;
 import com.music.model.mapper.MusicMapper;
-import com.music.repositories.BlockMusicRepository;
 import com.music.repositories.MusicRepository;
-import com.music.services.BlockMusicService;
+import com.music.repositories.UserMusicRepository;
+import com.music.services.CipherScraperService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class MusicServiceImplTest {
 
     @Mock
@@ -33,263 +35,148 @@ class MusicServiceImplTest {
     private MusicRepository musicRepository;
 
     @Mock
-    private BlockMusicService blockMusicService;
+    private UserMusicRepository userMusicRepository;
 
     @Mock
-    private BlockMusicRepository blockMusicRepository;
+    private CipherScraperService cipherScraperService;
 
     @InjectMocks
     private MusicServiceImpl musicService;
 
-    private MusicRequestDto requestDto;
+    private User user;
     private Music music;
-    private MusicResponseDto responseDto;
+    private UserMusic userMusic;
+    private AddMusicRequest addRequest;
 
     @BeforeEach
     void setup() {
-        MockitoAnnotations.openMocks(this);
+        // Configuração básica de usuário
+        user = new User();
+        user.setIdUser(1L);
 
-        requestDto = new MusicRequestDto(
-                "Oceano",
-                "Djavan",
-                ".....",
-                new ArrayList<>(),
-                1L
-        );
+        // Configuração básica de música
+        music = Music.builder()
+                .idMusic(100L)
+                .nameMusic("Oceano")
+                .artist("Djavan")
+                .slug("djavan/oceano")
+                .originalTone("D")
+                .cipherContent("<pre>Cifra original</pre>")
+                .build();
 
-        music = new Music();
-        music.setIdMusic(1L);
-        music.setNameMusic("Oceano");
-        music.setSinger("Djavan");
-        music.setLetterMusic(".....");
+        // Configuração de relação Usuário-Música
+        userMusic = UserMusic.builder()
+                .idUserMusic(10L)
+                .user(user)
+                .music(music)
+                .personalTone("D")
+                .build();
 
-        responseDto = new MusicResponseDto(
-                1L
-                , "Oceano"
-                , "Djavan"
-                , "....."
-                , new ArrayList<>()
-                , 1L);
+        // DTO de requisição
+        addRequest = new AddMusicRequest();
+        addRequest.setUrl("https://www.cifraclub.com.br/djavan/oceano/");
     }
 
     @Test
-    void shouldRegisterMusicSuccessfully_WithBlockMusics() {
-        List<Long> blockIds = List.of(1L, 2L);
-        requestDto.setIdBlockMusics(blockIds);
+    void shouldAddMusicFromCipherUrl_WhenMusicIsNew() {
+        // Cenário: Música não existe no banco, precisa fazer Scrape
+        String slug = "djavan/oceano";
 
-        BlockMusic block1 = new BlockMusic();
-        block1.setMusics(new ArrayList<>());
-
-        BlockMusic block2 = new BlockMusic();
-        block2.setMusics(new ArrayList<>());
-
-        List<BlockMusic> blocks = List.of(block1, block2);
-
-        when(blockMusicService.getBlockMusicsByIdBlockMusics(blockIds)).thenReturn(blocks);
-        when(musicMapper.toMusic(requestDto)).thenReturn(music);
+        when(musicRepository.findBySlug(slug)).thenReturn(Optional.empty());
+        when(cipherScraperService.scrapeMusic(addRequest.getUrl(), slug)).thenReturn(music);
         when(musicRepository.save(music)).thenReturn(music);
-        when(musicMapper.toMusicResponseDto(music)).thenReturn(responseDto);
 
-        MusicResponseDto result = musicService.registerMusic(requestDto);
+        when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.empty());
+        when(userMusicRepository.save(any(UserMusic.class))).thenReturn(userMusic);
 
+        // Mock do Mapper retornando um DTO vazio só para não quebrar
+        UserMusicDetailResponse responseDto = new UserMusicDetailResponse();
+        responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse()); // Garante que music não é null
+        when(musicMapper.toUserMusicDetailResponse(any(UserMusic.class))).thenReturn(responseDto);
+
+        // Execução
+        UserMusicDetailResponse result = musicService.addMusicFromCipherUrl(addRequest, user);
+
+        // Validações
         assertNotNull(result);
-        verify(musicRepository).save(music);
-        verify(blockMusicService).getBlockMusicsByIdBlockMusics(blockIds);
-
-        assertTrue(block1.getMusics().contains(music));
-        assertTrue(block2.getMusics().contains(music));
+        verify(cipherScraperService).scrapeMusic(addRequest.getUrl(), slug); // Garante que o Scraper foi chamado
+        verify(musicRepository).save(music); // Garante que salvou a música nova
+        verify(userMusicRepository).save(any(UserMusic.class)); // Garante que vinculou ao usuário
     }
 
     @Test
-    void shouldRegisterMusic_WhenIdBlockMusicsIsNull() {
-        requestDto.setIdBlockMusics(null);
-        when(musicMapper.toMusic(requestDto)).thenReturn(music);
-        when(musicRepository.save(any())).thenReturn(music);
-        when(musicMapper.toMusicResponseDto(any())).thenReturn(responseDto);
+    void shouldAddMusicFromCipherUrl_WhenMusicExists_AndUserAlreadyHasIt() {
+        // Cenário: Música já existe e usuário já tem ela na biblioteca
+        String slug = "djavan/oceano";
 
-        MusicResponseDto result = musicService.registerMusic(requestDto);
+        when(musicRepository.findBySlug(slug)).thenReturn(Optional.of(music));
+        when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.of(userMusic));
 
+        UserMusicDetailResponse responseDto = new UserMusicDetailResponse();
+        responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse());
+        when(musicMapper.toUserMusicDetailResponse(userMusic)).thenReturn(responseDto);
+
+        // Execução
+        UserMusicDetailResponse result = musicService.addMusicFromCipherUrl(addRequest, user);
+
+        // Validações
         assertNotNull(result);
-        verify(musicRepository).save(any());
-        verify(blockMusicService, never()).getBlockMusicsByIdBlockMusics(any());
+        verify(cipherScraperService, never()).scrapeMusic(anyString(), anyString()); // NÃO deve fazer scrape
+        verify(userMusicRepository, never()).save(any(UserMusic.class)); // NÃO deve salvar duplicado
     }
 
     @Test
-    void shouldRegisterMusic_WhenIdBlockMusicsIsEmpty() {
-        requestDto.setIdBlockMusics(new ArrayList<>());
-        when(musicMapper.toMusic(requestDto)).thenReturn(music);
-        when(musicRepository.save(any())).thenReturn(music);
-        when(musicMapper.toMusicResponseDto(any())).thenReturn(responseDto);
+    void shouldUpdatePersonalTone_Successfully() {
+        UpdateToneRequest toneRequest = new UpdateToneRequest();
+        toneRequest.setNewTone("G");
 
-        MusicResponseDto result = musicService.registerMusic(requestDto);
+        // Simula encontrar a UserMusic no banco
+        when(userMusicRepository.findById(10L)).thenReturn(Optional.of(userMusic));
 
+        // Simula salvar com o tom atualizado
+        when(userMusicRepository.save(any(UserMusic.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserMusicDetailResponse responseDto = new UserMusicDetailResponse();
+        responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse());
+        when(musicMapper.toUserMusicDetailResponse(any(UserMusic.class))).thenReturn(responseDto);
+
+        // Execução
+        UserMusicDetailResponse result = musicService.updatePersonalTone(10L, toneRequest, user.getIdUser());
+
+        // Validações
         assertNotNull(result);
-        verify(musicRepository).save(any());
-        verify(blockMusicService, never()).getBlockMusicsByIdBlockMusics(any());
+        assertEquals("G", userMusic.getPersonalTone()); // Verifica se o objeto foi alterado
+        verify(userMusicRepository).save(userMusic);
     }
 
     @Test
-    void shouldThrowException_WhenMusicAlreadyExists() {
-        when(musicRepository.findByNameMusicAndSingerAndUserIdUser("Oceano", "Djavan", 1L))
-                .thenReturn(Optional.of(music));
+    void shouldThrowException_WhenUpdatingTone_IfMusicDoesNotBelongToUser() {
+        UpdateToneRequest toneRequest = new UpdateToneRequest();
+        toneRequest.setNewTone("G");
 
-        assertThrows(MusicIsPresentException.class, () ->
-                musicService.existingMusic("Oceano", "Djavan", 1L));
+        User outroUser = new User();
+        outroUser.setIdUser(99L); // ID Diferente
+        userMusic.setUser(outroUser);
+
+        when(userMusicRepository.findById(10L)).thenReturn(Optional.of(userMusic));
+
+        // Execução e Validação de Erro
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            musicService.updatePersonalTone(10L, toneRequest, user.getIdUser());
+        });
+
+        assertEquals("Access denied: This music does not belong to your library.", exception.getMessage());
+        verify(userMusicRepository, never()).save(any());
     }
 
     @Test
-    void shouldGetMusicByIdSuccessfully() {
-        when(musicRepository.findById(1L)).thenReturn(Optional.of(music));
-        when(musicMapper.toMusicResponseDto(music)).thenReturn(responseDto);
+    void shouldGetAllUserMusics() {
+        when(userMusicRepository.findAllByUser_IdUser(user.getIdUser())).thenReturn(List.of(userMusic));
+        when(musicMapper.toUserMusicResponse(userMusic)).thenReturn(new UserMusicResponse());
 
-        MusicResponseDto result = musicService.getMusicById(1L);
+        List<UserMusicResponse> result = musicService.getAllUserMusics(user.getIdUser());
 
-        assertEquals(responseDto, result);
-    }
-
-    @Test
-    void shouldThrowException_WhenMusicNotFoundById() {
-        when(musicRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThrows(MusicNotFoundException.class, () -> musicService.getMusicById(99L));
-    }
-
-    @Test
-    void shouldReturnAllMusicByUser() {
-        when(musicRepository.findAllMusicByUserIdUser(1L)).thenReturn(List.of(music));
-        when(musicMapper.toListMusicResponseDto(anyList())).thenReturn(List.of(responseDto));
-
-        List<MusicResponseDto> list = musicService.getAllMusicByIdUser(1L);
-
-        assertEquals(1, list.size());
-    }
-
-    @Test
-    void shouldThrowException_WhenUserHasNoMusic() {
-        when(musicRepository.findAllMusicByUserIdUser(1L)).thenReturn(Collections.emptyList());
-        assertThrows(MusicNotFoundException.class, () -> musicService.getAllMusicByIdUser(1L));
-    }
-
-    @Test
-    void shouldReturnAllMusicByBlock() {
-        when(musicRepository.findAllMusicByBlockMusicsIdBlockMusic(1L)).thenReturn(List.of(music));
-        when(musicMapper.toListMusicResponseDto(anyList())).thenReturn(List.of(responseDto));
-
-        List<MusicResponseDto> list = musicService.getAllMusicByIdBlockMusic(1L);
-
-        assertEquals(1, list.size());
-    }
-
-    @Test
-    void shouldThrowException_WhenBlockHasNoMusic() {
-        when(musicRepository.findAllMusicByBlockMusicsIdBlockMusic(1L)).thenReturn(Collections.emptyList());
-        assertThrows(MusicNotFoundException.class, () -> musicService.getAllMusicByIdBlockMusic(1L));
-    }
-
-    @Test
-    void shouldUpdateMusicSuccessfully() {
-        when(musicRepository.findById(1L)).thenReturn(Optional.of(music));
-        when(musicRepository.save(any())).thenReturn(music);
-        when(musicMapper.toMusicResponseDto(any())).thenReturn(responseDto);
-
-        MusicResponseDto result = musicService.updateMusic(1L, requestDto);
-
-        assertNotNull(result);
-        verify(musicRepository).save(any());
-    }
-
-    @Test
-    void shouldUpdateMusic_WhenAllFieldsAreNotNull() {
-        Music existingMusic = new Music();
-        existingMusic.setIdMusic(1L);
-        existingMusic.setNameMusic("Nome Original");
-        existingMusic.setSinger("Cantor Original");
-        existingMusic.setLetterMusic("Letra Original");
-
-        MusicRequestDto requestDto = new MusicRequestDto(
-                "Novo Nome",
-                "Novo Cantor",
-                "Nova Letra",
-                new ArrayList<>(),
-                1L
-        );
-
-        when(musicRepository.findById(1L)).thenReturn(Optional.of(existingMusic));
-        when(musicRepository.save(existingMusic)).thenReturn(existingMusic);
-        when(musicMapper.toMusicResponseDto(existingMusic)).thenReturn(new MusicResponseDto());
-
-        MusicResponseDto response = musicService.updateMusic(1L, requestDto);
-
-        assertNotNull(response);
-        assertEquals("Novo Nome", existingMusic.getNameMusic());
-        assertEquals("Novo Cantor", existingMusic.getSinger());
-        assertEquals("Nova Letra", existingMusic.getLetterMusic());
-        verify(musicRepository).save(existingMusic);
-    }
-
-    @Test
-    void shouldUpdateMusic_WhenAllFieldsAreNull() {
-        Music existingMusic = new Music();
-        existingMusic.setIdMusic(1L);
-        existingMusic.setNameMusic("Novo Nome");
-        existingMusic.setSinger("Novo Cantor");
-        existingMusic.setLetterMusic("Nova Letra");
-
-        MusicRequestDto requestDto = new MusicRequestDto(
-                null,
-                null,
-                null,
-                new ArrayList<>(),
-                1L
-        );
-
-        when(musicRepository.findById(1L)).thenReturn(Optional.of(existingMusic));
-        when(musicRepository.save(existingMusic)).thenReturn(existingMusic);
-        when(musicMapper.toMusicResponseDto(existingMusic)).thenReturn(new MusicResponseDto());
-
-        MusicResponseDto response = musicService.updateMusic(1L, requestDto);
-
-        assertNotNull(response);
-        assertEquals("Novo Nome", existingMusic.getNameMusic());
-        assertEquals("Novo Cantor", existingMusic.getSinger());
-        assertEquals("Nova Letra", existingMusic.getLetterMusic());
-        verify(musicRepository).save(existingMusic);
-    }
-
-
-    @Test
-    void shouldDeleteMusic_WhenBlockMusicsIsNull() {
-        music.setBlockMusics(null);
-        when(musicRepository.findById(1L)).thenReturn(Optional.of(music));
-
-        String result = musicService.deleteMusic(1L);
-
-        assertEquals("Música com ID 1 excluída com sucesso!", result);
-        verify(musicRepository).delete(music);
-    }
-
-    @Test
-    void shouldDeleteMusic_WhenBlockMusicsIsEmpty() {
-        music.setBlockMusics(new ArrayList<>());
-        when(musicRepository.findById(1L)).thenReturn(Optional.of(music));
-
-        String result = musicService.deleteMusic(1L);
-
-        assertEquals("Música com ID 1 excluída com sucesso!", result);
-        verify(musicRepository).delete(music);
-    }
-
-    @Test
-    void shouldDeleteMusic_WhenBlockMusicsIsNotEmpty() {
-        BlockMusic blockMusic = new BlockMusic();
-        blockMusic.setMusics(new ArrayList<>(List.of(music)));
-        music.setBlockMusics(List.of(blockMusic));
-
-        when(musicRepository.findById(1L)).thenReturn(Optional.of(music));
-
-        String result = musicService.deleteMusic(1L);
-
-        assertEquals("Música com ID 1 excluída com sucesso!", result);
-        verify(blockMusicRepository).save(blockMusic);
-        verify(musicRepository).delete(music);
+        assertFalse(result.isEmpty());
+        assertEquals(1, result.size());
     }
 }

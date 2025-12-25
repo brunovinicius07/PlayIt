@@ -1,5 +1,6 @@
 package com.music.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -23,20 +24,20 @@ public class BlockMusic {
 
     @Size(max = 25)
     @NotBlank
+    @JsonIgnore
     private String nameBlockMusic;
 
     @ManyToOne
     @JoinColumn(name = "idRepertoire")
     private Repertoire repertoire;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "TB_BLOCK_MUSIC_MUSIC",
-            joinColumns = @JoinColumn(name = "idBlockMusic"),
-            inverseJoinColumns = @JoinColumn(name = "idMusic")
-    )
-    @ToString.Exclude
-    private List<Music> musics = new ArrayList<>();
+    @OneToMany(mappedBy = "blockMusic", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BlockMusicItem> items = new ArrayList<>();
+
+    public void addItem(BlockMusicItem item) {
+        items.add(item);
+        item.setBlockMusic(this);
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "idUser", nullable = false)

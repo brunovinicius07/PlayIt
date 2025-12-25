@@ -1,33 +1,29 @@
 package com.music.model.mapper;
 
-import com.music.model.dto.request.MusicRequestDto;
-import com.music.model.dto.response.MusicResponseDto;
-import com.music.model.entity.BlockMusic;
+import com.music.model.dto.response.MusicDetailResponse;
+import com.music.model.dto.response.MusicSummaryResponse;
+import com.music.model.dto.response.UserMusicDetailResponse;
+import com.music.model.dto.response.UserMusicResponse;
 import com.music.model.entity.Music;
+import com.music.model.entity.UserMusic;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import org.mapstruct.Named;
 
 @Mapper(componentModel = "spring")
 public interface MusicMapper {
 
-    @Mapping(target = "user.idUser", source = "idUser")
-    Music toMusic(MusicRequestDto dto);
+    // Mapeamentos para Resumo (Listas)
+    @Named("toSummary")
+    MusicSummaryResponse toMusicSummaryResponse(Music music);
 
-    @Mapping(target = "idUser", source = "user.idUser")
-    @Mapping(target = "idBlockMusics", expression = "java(mapBlockMusic(music.getBlockMusics()))")
-    MusicResponseDto toMusicResponseDto(Music music);
+    @Mapping(target = "music", source = "music", qualifiedByName = "toSummary")
+    UserMusicResponse toUserMusicResponse(UserMusic userMusic);
 
-    List<MusicResponseDto> toListMusicResponseDto(List<Music> musicList);
+    // Mapeamentos para Detalhe (Tela de Ensaio/Visualização)
+    @Named("toDetail")
+    MusicDetailResponse toMusicDetailResponse(Music music);
 
-    default List<Long> mapBlockMusic(List<BlockMusic> blockMusics) {
-        if (blockMusics == null) return new ArrayList<>();
-        return blockMusics.stream()
-                .map(BlockMusic::getIdBlockMusic)
-                .collect(Collectors.toList());
-    }
+    @Mapping(target = "music", source = "music", qualifiedByName = "toDetail")
+    UserMusicDetailResponse toUserMusicDetailResponse(UserMusic userMusic);
 }
-

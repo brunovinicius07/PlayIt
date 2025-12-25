@@ -72,13 +72,13 @@ public class RepertoireServiceImpl implements RepertoireService {
     public String deleteRepertoire(Long idRepertoire) {
         Repertoire repertoire = validateRepertoire(idRepertoire);
 
+        // A lógica manual de limpeza de BlockMusic não é necessária se o CascadeType.ALL estiver configurado corretamente em Repertoire -> BlockMusic
+        // Mas se quisermos garantir a remoção explícita:
         if(repertoire.getBlockMusics() != null && !repertoire.getBlockMusics().isEmpty()){
             List<BlockMusic> blockMusicList =  blockMusicRepository.findAllBlockMusicByRepertoireIdRepertoire(idRepertoire);
             blockMusicList.forEach(blockMusic -> {
-
                 blockMusic.setRepertoire(null);
-                blockMusic.setMusics(null);
-
+                // blockMusic.setMusics(null); // Removido: Campo não existe mais. Cascade cuidará dos itens.
                 blockMusicRepository.delete(blockMusic);
             });
         }

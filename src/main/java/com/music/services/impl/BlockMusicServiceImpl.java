@@ -5,7 +5,9 @@ import com.music.model.dto.request.MusicToBlockRequest;
 import com.music.model.dto.response.BlockMusicResponseDto;
 import com.music.model.dto.response.MusicResponseDto;
 import com.music.model.entity.BlockMusic;
+import com.music.model.entity.BlockMusicItem;
 import com.music.model.entity.Music;
+import com.music.model.entity.UserMusic;
 import com.music.model.exceptions.blockMusic.BlockMusicIsPresentException;
 import com.music.model.exceptions.blockMusic.BlockMusicNotFoundException;
 import com.music.model.exceptions.music.MusicNotFoundException;
@@ -13,6 +15,7 @@ import com.music.model.mapper.BlockMusicMapper;
 import com.music.model.mapper.MusicMapper;
 import com.music.repositories.BlockMusicRepository;
 import com.music.repositories.MusicRepository;
+import com.music.repositories.UserMusicRepository;
 import com.music.services.BlockMusicService;
 import com.music.services.RepertoireService;
 import lombok.RequiredArgsConstructor;
@@ -28,14 +31,11 @@ import java.util.Optional;
 public class BlockMusicServiceImpl implements BlockMusicService {
 
     private final BlockMusicRepository blockMusicRepository;
-
     private final BlockMusicMapper blockMusicMapper;
-
     private final RepertoireService repertoireService;
-
     private final MusicRepository musicRepository;
-
     private final MusicMapper musicMapper;
+    private final UserMusicRepository userMusicRepository;
 
     @Override
     @Transactional(readOnly = false)
@@ -52,7 +52,6 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     @Transactional(readOnly = true)
     public BlockMusicResponseDto getBlockMusicByIdBlockMusic(Long idBlockMusic) {
         BlockMusic blockMusic = validateBlockMusic(idBlockMusic);
-
         return blockMusicMapper.toBlockMusicResponseDto(blockMusic);
     }
 
@@ -81,7 +80,6 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     public String deleteBlockMusic(Long idBlockMusic) {
         BlockMusic blockMusic = validateBlockMusic(idBlockMusic);
         blockMusicRepository.delete(blockMusic);
-        
         return "Bloco com ID " + idBlockMusic + " excluído com sucesso!";
     }
 
@@ -105,17 +103,36 @@ public class BlockMusicServiceImpl implements BlockMusicService {
         List<BlockMusic> blockMusicList = getBlockMusicsByIdBlockMusics(musicToBlockRequest.getIdsBlockMusic());
 
         blockMusicList.forEach(blockMusic -> {
+            // Busca o usuário dono do bloco (via Repertoire)
+            var user = blockMusic.getRepertoire().getUser();
+            
+            // Busca o UserMusic correspondente
+            UserMusic userMusic = userMusicRepository.findByUserAndMusic(user, music)
+                    .orElseThrow(() -> new RuntimeException("Música não encontrada na biblioteca do usuário."));
 
-            if (!blockMusic.getMusics().contains(music)) {
-                blockMusic.getMusics().add(music);
+            // Verifica duplicidade
+            boolean exists = blockMusic.getItems().stream()
+                    .anyMatch(item -> item.getUserMusic().equals(userMusic));
+
+            if (!exists) {
+                BlockMusicItem newItem = BlockMusicItem.builder()
+                        .blockMusic(blockMusic)
+                        .userMusic(userMusic)
+                        .build();
+                
+                blockMusic.addItem(newItem);
+                blockMusicRepository.save(blockMusic);
             }
-
-            blockMusicRepository.save(blockMusic);
         });
 
-        music.getBlockMusics().addAll(blockMusicList);
-
-        return musicMapper.toMusicResponseDto(musicRepository.save(music));
+        // Conversão manual para MusicResponseDto (Legado)
+        MusicResponseDto response = new MusicResponseDto();
+        response.setIdMusic(music.getIdMusic());
+        response.setNameMusic(music.getNameMusic());
+        response.setSinger(music.getArtist()); // Adaptando artist -> singer
+        // response.setLetterMusic(music.getCipherContent()); // Opcional, dependendo do DTO legado
+        
+        return response;
     }
 
     @Override

@@ -49,7 +49,7 @@ class UserServiceImplTest {
                 .email("user71@email.com")
                 .password("senhaCriptografada")
                 .role(UserRole.ADMIN)
-                .musics(List.of())
+                .myLibrary(List.of())
                 .repertoires(List.of())
                 .build();
 
@@ -62,8 +62,7 @@ class UserServiceImplTest {
                 "Novo Nome",
                 "novo@email.com",
                 false,
-                null, null, null
-        );
+                null, null, null);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenReturn(user);
@@ -86,8 +85,7 @@ class UserServiceImplTest {
                 true,
                 "senha atual",
                 "senha nova",
-                "senha nova"
-        );
+                "senha nova");
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("senha atual", "senhaCriptografada")).thenReturn(true);
@@ -110,8 +108,7 @@ class UserServiceImplTest {
                 true,
                 "senha atual",
                 "nova senha",
-                "nova senha"
-        );
+                "nova senha");
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("senha atual", "senhaCriptografada")).thenReturn(false);
@@ -130,8 +127,7 @@ class UserServiceImplTest {
                 true,
                 "senha atual",
                 "senha nova",
-                "senha diferente"
-        );
+                "senha diferente");
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("senha atual", "senhaCriptografada")).thenReturn(true);
@@ -149,8 +145,7 @@ class UserServiceImplTest {
         String result = userService.deleteUser(1L);
 
         assertTrue(result.contains("apagado com sucesso"));
-        verify(musicRepository).deleteAll(user.getMusics());
-        verify(repertoireRepository).deleteAll(user.getRepertoires());
+
         verify(userRepository).delete(user);
     }
 

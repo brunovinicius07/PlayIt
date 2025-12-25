@@ -4,8 +4,7 @@ import com.music.model.dto.request.BlockMusicRequestDto;
 import com.music.model.dto.request.MusicToBlockRequest;
 import com.music.model.dto.response.BlockMusicResponseDto;
 import com.music.model.dto.response.MusicResponseDto;
-import com.music.model.entity.BlockMusic;
-import com.music.model.entity.Music;
+import com.music.model.entity.*;
 import com.music.model.exceptions.blockMusic.BlockMusicIsPresentException;
 import com.music.model.exceptions.blockMusic.BlockMusicNotFoundException;
 import com.music.model.exceptions.music.MusicNotFoundException;
@@ -13,6 +12,7 @@ import com.music.model.mapper.BlockMusicMapper;
 import com.music.model.mapper.MusicMapper;
 import com.music.repositories.BlockMusicRepository;
 import com.music.repositories.MusicRepository;
+import com.music.repositories.UserMusicRepository;
 import com.music.services.RepertoireService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +40,9 @@ class BlockMusicServiceImplTest {
     @Mock
     private MusicMapper musicMapper;
 
+    @Mock
+    private UserMusicRepository userMusicRepository;
+
     @InjectMocks
     private BlockMusicServiceImpl blockMusicService;
 
@@ -57,13 +60,13 @@ class BlockMusicServiceImplTest {
         blockMusic = BlockMusic.builder()
                 .idBlockMusic(1L)
                 .nameBlockMusic("Bloco Sertanejo")
-                .musics(new ArrayList<>())
+                .items(new ArrayList<>())
                 .build();
 
         music = Music.builder()
                 .idMusic(1L)
                 .nameMusic("Música 1")
-                .blockMusics(new ArrayList<>())
+                .artist("Artista 1")
                 .build();
     }
 
@@ -137,8 +140,7 @@ class BlockMusicServiceImplTest {
     void shouldReturnAllBlockMusicSuccessfully() {
         List<BlockMusic> blockMusicList = Arrays.asList(
                 BlockMusic.builder().idBlockMusic(1L).build(),
-                BlockMusic.builder().idBlockMusic(2L).build()
-        );
+                BlockMusic.builder().idBlockMusic(2L).build());
 
         when(blockMusicRepository.findAllBlockMusicByUserIdUser(1L)).thenReturn(blockMusicList);
         when(blockMusicMapper.toListBlockMusicResponseDto(blockMusicList))
@@ -236,17 +238,31 @@ class BlockMusicServiceImplTest {
     void shouldLinkMusicToBlockSuccessfully() {
         MusicToBlockRequest request = new MusicToBlockRequest(List.of(1L), 1L);
 
+        // Configurar mocks para garantir que o usuário e userMusic sejam encontrados
+        User user = new User();
+        Repertoire repertoire = new Repertoire();
+        repertoire.setUser(user);
+        blockMusic.setRepertoire(repertoire);
+        blockMusic.setItems(new ArrayList<>()); // Inicializar lista de items
+
+        UserMusic userMusic = UserMusic.builder()
+                .user(user)
+                .music(music)
+                .build();
+
         when(musicRepository.findById(1L)).thenReturn(Optional.of(music));
         when(blockMusicRepository.findById(1L)).thenReturn(Optional.of(blockMusic));
+        when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.of(userMusic));
         when(blockMusicRepository.save(blockMusic)).thenReturn(blockMusic);
-        when(musicRepository.save(music)).thenReturn(music);
-        when(musicMapper.toMusicResponseDto(music)).thenReturn(new MusicResponseDto());
 
         MusicResponseDto response = blockMusicService.linkMusicToBLock(request);
 
         assertNotNull(response);
-        assertTrue(blockMusic.getMusics().contains(music));
-        assertTrue(music.getBlockMusics().contains(blockMusic));
+        assertEquals(music.getIdMusic(), response.getIdMusic());
+
+        // Verificar se foi adicionado
+        assertFalse(blockMusic.getItems().isEmpty());
+        assertEquals(userMusic, blockMusic.getItems().get(0).getUserMusic());
     }
 
     @Test
@@ -256,26 +272,37 @@ class BlockMusicServiceImplTest {
 
         MusicToBlockRequest request = new MusicToBlockRequest(List.of(blockId), musicId);
 
-        BlockMusic blockMusic = new BlockMusic();
-        blockMusic.setMusics(new ArrayList<>());
-        Music music = new Music();
-        music.setBlockMusics(new ArrayList<>());
+        User user = new User();
+        Repertoire repertoire = new Repertoire();
+        repertoire.setUser(user);
 
-        blockMusic.getMusics().add(music);
+        BlockMusic blockMusic = new BlockMusic();
+        blockMusic.setIdBlockMusic(blockId);
+        blockMusic.setRepertoire(repertoire);
+        blockMusic.setItems(new ArrayList<>());
+
+        UserMusic userMusic = UserMusic.builder().user(user).music(music).build();
+
+        // Adiciona um item existente
+        BlockMusicItem existingItem = BlockMusicItem.builder()
+                .blockMusic(blockMusic)
+                .userMusic(userMusic)
+                .build();
+        blockMusic.getItems().add(existingItem);
+
+        // Mocking findAllBlockMusicByUserIdUser not needed here as we mock
+        // getBlockMusicsByIdBlockMusics manually or use default implementation?
+        // Wait, the service uses getBlockMusicsByIdBlockMusics which does findById.
 
         when(musicRepository.findById(musicId)).thenReturn(Optional.of(music));
-        when(blockMusicRepository.save(any())).thenReturn(blockMusic);
-        when(musicRepository.save(any())).thenReturn(music);
-        when(musicMapper.toMusicResponseDto(any())).thenReturn(new MusicResponseDto());
-
-        doReturn(List.of(blockMusic)).when(blockMusicService).getBlockMusicsByIdBlockMusics(List.of(blockId));
+        when(blockMusicRepository.findById(blockId)).thenReturn(Optional.of(blockMusic));
+        when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.of(userMusic));
 
         MusicResponseDto result = blockMusicService.linkMusicToBLock(request);
 
         assertNotNull(result);
-        assertEquals(1, blockMusic.getMusics().size());
-        verify(blockMusicRepository).save(blockMusic);
-        verify(musicRepository).save(music);
+        assertEquals(1, blockMusic.getItems().size());
+        verify(blockMusicRepository, never()).save(blockMusic); // Não deve salvar se já existe
     }
 
     @Test

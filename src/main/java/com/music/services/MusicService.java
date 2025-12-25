@@ -1,27 +1,20 @@
 package com.music.services;
 
-import com.music.model.dto.request.MusicRequestDto;
-import com.music.model.dto.response.MusicResponseDto;
-import com.music.model.entity.Music;
+import com.music.model.dto.request.AddMusicRequest;
+import com.music.model.dto.request.UpdateToneRequest;
+import com.music.model.dto.response.UserMusicDetailResponse;
+import com.music.model.dto.response.UserMusicResponse;
+import com.music.model.entity.User;
 
 import java.util.List;
 
 public interface MusicService {
 
-    MusicResponseDto registerMusic(MusicRequestDto musicRequestDto);
+    UserMusicDetailResponse addMusicFromCipherUrl(AddMusicRequest request, User user);
+    
+    UserMusicDetailResponse getUserMusicDetail(Long idUserMusic, Long userId);
+    
+    List<UserMusicResponse> getAllUserMusics(Long userId);
 
-    MusicResponseDto getMusicById(Long idMusic);
-
-    List<MusicResponseDto> getAllMusicByIdUser(Long idUser);
-
-    List<MusicResponseDto> getAllMusicByIdBlockMusic(Long idBlockMusic);
-
-    MusicResponseDto updateMusic(Long idMusic, MusicRequestDto musicRequestDto);
-
-    String deleteMusic(Long idMusic);
-
-    void existingMusic(String nameMusic, String singer, Long idUser);
-
-    Music validateMusic(Long idMusic);
-
+    UserMusicDetailResponse updatePersonalTone(Long idUserMusic, UpdateToneRequest request, Long userId);
 }

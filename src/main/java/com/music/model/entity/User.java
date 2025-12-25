@@ -41,8 +41,8 @@ public class User implements UserDetails {
     @NotNull
     private UserRole role;
 
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
-    private List<Music> musics = new ArrayList<>();
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<UserMusic> myLibrary = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<Repertoire> repertoires = new ArrayList<>();

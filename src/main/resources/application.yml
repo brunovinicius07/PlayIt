@@ -43,7 +43,7 @@ feign:
         readTimeout: 5000
 
 schedule-event-service:
-  url: ${SCHEDULE_EVENT_SERVICE_URL}
+  url: ${SCHEDULE_EVENT_SERVICE_URL:http://localhost:8082}
 
 api:
   security:
