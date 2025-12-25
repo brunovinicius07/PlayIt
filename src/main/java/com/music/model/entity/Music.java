@@ -13,8 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "tb_music",
-        indexes = @Index(name = "idx_music_slug", columnList = "slug", unique = true))
+@Table(name = "tb_music", indexes = @Index(name = "idx_music_slug", columnList = "slug", unique = true))
 public class Music {
 
     @Id
@@ -37,7 +36,7 @@ public class Music {
 
     // A Cifra completa (HTML/Texto) raspada do site
     @Lob
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(columnDefinition = "LONGTEXT", nullable = false)
     private String cipherContent;
 
     // Relacionamento reverso (apenas para mapeamento JPA)
