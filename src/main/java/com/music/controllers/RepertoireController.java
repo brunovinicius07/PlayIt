@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,8 +29,7 @@ public class RepertoireController {
     }
 
     @PostMapping("/{idUser}")
-    ResponseEntity<List<RepertoireResponseDto>> getAllRepertoireByIdUser(@PathVariable Long idUser){
-        var user = (User)SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    ResponseEntity<List<RepertoireResponseDto>> getAllRepertoireByIdUser(@AuthenticationPrincipal User user){
         var repertoireResponse = repertoireService.getAllRepertoireByIdUser(user.getIdUser());
         return ResponseEntity.ok(repertoireResponse);
     }

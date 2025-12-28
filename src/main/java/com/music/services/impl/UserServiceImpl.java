@@ -64,10 +64,6 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = false)
     public String deleteUser(Long idUser) {
         User user = validateUser(idUser);
-
-        musicRepository.deleteAll(user.getMusics());
-        repertoireRepository.deleteAll(user.getRepertoires());
-
         userRepository.delete(user);
         return "Usuário com o id " + idUser + " apagado com sucesso!";
     }

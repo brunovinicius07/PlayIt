@@ -1,122 +1,130 @@
 package com.music.services.impl;
 
-import com.music.model.dto.request.MusicRequestDto;
-import com.music.model.dto.response.MusicResponseDto;
+import com.music.model.dto.request.AddMusicRequest;
+import com.music.model.dto.request.UpdateToneRequest;
+import com.music.model.dto.response.UserMusicDetailResponse;
+import com.music.model.dto.response.UserMusicResponse;
 import com.music.model.entity.Music;
-import com.music.model.exceptions.music.MusicIsPresentException;
-import com.music.model.exceptions.music.MusicNotFoundException;
+import com.music.model.entity.User;
+import com.music.model.entity.UserMusic;
 import com.music.model.mapper.MusicMapper;
-import com.music.repositories.BlockMusicRepository;
 import com.music.repositories.MusicRepository;
-import com.music.services.BlockMusicService;
+import com.music.repositories.UserMusicRepository;
+import com.music.services.CipherScraperService;
 import com.music.services.MusicService;
+import com.music.util.ToneTransposer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service
 public class MusicServiceImpl implements MusicService {
 
     private final MusicMapper musicMapper;
-
     private final MusicRepository musicRepository;
-
-    private final BlockMusicService musicService;
-
-    private final BlockMusicRepository blockMusicRepository;
+    private final UserMusicRepository userMusicRepository;
+    private final CipherScraperService cipherScraperService;
 
     @Override
-    @Transactional(readOnly = false)
-    public MusicResponseDto registerMusic(MusicRequestDto musicRequestDto) {
+    @Transactional
+    public UserMusicDetailResponse addMusicFromCipherUrl(AddMusicRequest request, User user) {
+        String url = request.getUrl();
+        String[] parts = extractArtistAndMusicFromUrl(url);
 
-        existingMusic(musicRequestDto.getNameMusic(), musicRequestDto.getSinger(), musicRequestDto.getIdUser());
+        Music music = cipherScraperService.findAndScrapeMusic(parts[0], parts[1]);
 
-        Music music = musicMapper.toMusic(musicRequestDto);
+        Optional<Music> existingMusic = musicRepository.findBySlug(music.getSlug());
 
-        if (musicRequestDto.getIdBlockMusics() != null && !musicRequestDto.getIdBlockMusics().isEmpty()) {
-            var blockMusics = musicService.getBlockMusicsByIdBlockMusics(musicRequestDto.getIdBlockMusics());
-            music.setBlockMusics(blockMusics);
-            blockMusics.forEach(blockMusic -> blockMusic.getMusics().add(music));
+        if (existingMusic.isPresent()) {
+            music = existingMusic.get();
+        } else {
+            music = musicRepository.save(music);
         }
 
-        return musicMapper.toMusicResponseDto(musicRepository.save(music));
-    }
+        Optional<UserMusic> existingUserMusic = userMusicRepository.findByUserAndMusic(user, music);
 
-    @Override
-    @Transactional(readOnly = true)
-    public MusicResponseDto getMusicById(Long idMusic) {
-        Music music = validateMusic(idMusic);
-
-        return musicMapper.toMusicResponseDto(music);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<MusicResponseDto> getAllMusicByIdUser(Long idUser) {
-        List<Music> musicList = musicRepository.findAllMusicByUserIdUser(idUser);
-        if (musicList.isEmpty()) throw new MusicNotFoundException();
-
-        return musicMapper.toListMusicResponseDto(musicList);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<MusicResponseDto> getAllMusicByIdBlockMusic(Long idBlockMusic) {
-        List<Music> musicList = musicRepository.findAllMusicByBlockMusicsIdBlockMusic(idBlockMusic);
-        if (musicList.isEmpty()) throw new MusicNotFoundException();
-
-        return musicMapper.toListMusicResponseDto(musicList);
-    }
-
-    @Override
-    @Transactional(readOnly = false)
-    public MusicResponseDto updateMusic(Long idMusic, MusicRequestDto musicRequestDto) {
-        Music music = validateMusic(idMusic);
-        music.setNameMusic(musicRequestDto.getNameMusic() != null
-                ? musicRequestDto.getNameMusic() : music.getNameMusic());
-        music.setSinger(musicRequestDto.getSinger() != null
-                ? musicRequestDto.getSinger() : music.getSinger());
-        music.setLetterMusic(musicRequestDto.getLetterMusic() != null
-                ? musicRequestDto.getLetterMusic() : music.getLetterMusic());
-
-        return musicMapper.toMusicResponseDto(musicRepository.save(music));
-    }
-
-    @Override
-    @Transactional(readOnly = false)
-    public String deleteMusic(Long idMusic) {
-        Music music = validateMusic(idMusic);
-
-
-        if (music.getBlockMusics() != null && !music.getBlockMusics().isEmpty()) {
-
-            music.getBlockMusics().forEach(blockMusic -> {
-                blockMusic.getMusics().remove(music);
-                blockMusicRepository.save(blockMusic);
-            });
+        if (existingUserMusic.isPresent()) {
+            return buildTransposedResponse(existingUserMusic.get());
         }
 
-        music.setBlockMusics(null);
-        musicRepository.delete(music);
+        UserMusic newUserMusic = UserMusic.builder()
+                .user(user)
+                .music(music)
+                .personalTone(music.getOriginalTone())
+                .build();
 
-        return "Música com ID " + idMusic + " excluída com sucesso!";
+        UserMusic savedUserMusic = userMusicRepository.save(newUserMusic);
+
+        return buildTransposedResponse(savedUserMusic);
+    }
+
+    private String[] extractArtistAndMusicFromUrl(String url) {
+        // Remove protocolo e www, se houver
+        String cleanUrl = url.replaceAll("https?://(www\\.)?cifraclub\\.com\\.br/", "");
+        if (cleanUrl.endsWith("/"))
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+
+        String[] parts = cleanUrl.split("/");
+        if (parts.length < 2) {
+            throw new IllegalArgumentException("URL inválida. Formato esperado: cifraclub.com.br/artista/musica");
+        }
+
+        return new String[] { parts[0], parts[1] };
     }
 
     @Override
     @Transactional(readOnly = true)
-    public void existingMusic(String nameMusic, String singer, Long idUser) {
-        musicRepository.findByNameMusicAndSingerAndUserIdUser(nameMusic, singer, idUser)
-                .ifPresent(music -> {
-                    throw new MusicIsPresentException();
-                });
+    public UserMusicDetailResponse getUserMusicDetail(Long idUserMusic, Long userId) {
+        UserMusic userMusic = validateUserMusicOwnership(idUserMusic, userId);
+        return buildTransposedResponse(userMusic);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Music validateMusic(Long idMusic) {
-        return musicRepository.findById(idMusic).orElseThrow(MusicNotFoundException::new);
+    public List<UserMusicResponse> getAllUserMusics(Long userId) {
+        List<UserMusic> library = userMusicRepository.findAllByUser_IdUser(userId);
+        return library.stream()
+                .map(musicMapper::toUserMusicResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public UserMusicDetailResponse updatePersonalTone(Long idUserMusic, UpdateToneRequest request, Long userId) {
+        UserMusic userMusic = validateUserMusicOwnership(idUserMusic, userId);
+
+        userMusic.setPersonalTone(request.getNewTone());
+        UserMusic updatedUserMusic = userMusicRepository.save(userMusic);
+
+        return buildTransposedResponse(updatedUserMusic);
+    }
+
+    private UserMusic validateUserMusicOwnership(Long idUserMusic, Long userId) {
+        UserMusic userMusic = userMusicRepository.findById(idUserMusic)
+                .orElseThrow(() -> new RuntimeException("Music not found in library."));
+
+        if (!userMusic.getUser().getIdUser().equals(userId)) {
+            throw new RuntimeException("Access denied: This music does not belong to your library.");
+        }
+        return userMusic;
+    }
+
+    private UserMusicDetailResponse buildTransposedResponse(UserMusic userMusic) {
+        UserMusicDetailResponse response = musicMapper.toUserMusicDetailResponse(userMusic);
+
+        String originalTone = userMusic.getMusic().getOriginalTone();
+        String personalTone = userMusic.getPersonalTone();
+        String originalCipher = userMusic.getMusic().getCipherContent();
+
+        String transposedCipher = ToneTransposer.transpose(originalCipher, originalTone, personalTone);
+
+        response.getMusic().setCipherContent(transposedCipher);
+
+        return response;
     }
 }

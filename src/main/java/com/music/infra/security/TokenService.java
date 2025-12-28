@@ -31,7 +31,14 @@ public class TokenService {
     private long timeExpirationToken;
 
     public String generateToken(UserDetails userDetails) {
+        Long idUser = null;
+        if (userDetails instanceof User) {
+            idUser = ((User) userDetails).getIdUser();
+        }
+
+        assert idUser != null;
         Map<String, Object> claims = Map.of(
+                "id", idUser,
                 "roles", userDetails.getAuthorities()
                         .stream()
                         .map(GrantedAuthority::getAuthority)

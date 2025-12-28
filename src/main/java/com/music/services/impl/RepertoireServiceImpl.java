@@ -75,10 +75,7 @@ public class RepertoireServiceImpl implements RepertoireService {
         if(repertoire.getBlockMusics() != null && !repertoire.getBlockMusics().isEmpty()){
             List<BlockMusic> blockMusicList =  blockMusicRepository.findAllBlockMusicByRepertoireIdRepertoire(idRepertoire);
             blockMusicList.forEach(blockMusic -> {
-
                 blockMusic.setRepertoire(null);
-                blockMusic.setMusics(null);
-
                 blockMusicRepository.delete(blockMusic);
             });
         }
