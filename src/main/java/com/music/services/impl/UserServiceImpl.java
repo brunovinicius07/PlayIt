@@ -64,11 +64,6 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = false)
     public String deleteUser(Long idUser) {
         User user = validateUser(idUser);
-
-        // O CascadeType.ALL nas entidades User -> UserMusic e User -> Repertoire
-        // garante que os dados relacionados sejam excluídos automaticamente.
-        // Não devemos deletar do musicRepository pois as músicas são globais.
-
         userRepository.delete(user);
         return "Usuário com o id " + idUser + " apagado com sucesso!";
     }

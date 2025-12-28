@@ -8,6 +8,6 @@ import lombok.Data;
 public class AddMusicRequest {
 
     @NotBlank(message = "A URL não pode estar em branco.")
-    @Pattern(regexp = "^(https?://)?(www\\.)?cifraclub\\.com\\.br/.+/.+", message = "URL inválida. Deve ser uma URL do CifraClub.")
+    @Pattern(regexp = "^(https?://)?(www\\.)?cifraclub\\.com\\.br/.+/.+", message = "URL inválida.")
     private String url;
 }

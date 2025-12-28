@@ -27,25 +27,22 @@ public class UserMusic {
     @JsonIgnore
     private User user;
 
-    @ManyToOne(fetch = FetchType.EAGER) // Traz os dados da música (Nome/Artista) automaticamente
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "idMusic", nullable = false)
     private Music music;
 
-    // O CAMPO DE OURO: O último tom que o usuário escolheu.
-    // Atualize este campo sempre que ele mudar o tom no front.
+
     @Column(length = 5)
     private String personalTone;
 
     private LocalDateTime addedAt;
 
-    // Se deletar da biblioteca, remove dos repertórios também (Cascade)
     @OneToMany(mappedBy = "userMusic", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<BlockMusicItem> linkedInBlocks = new ArrayList<>();
 
     @PrePersist
     public void prePersist() {
         this.addedAt = LocalDateTime.now();
-        // Se não escolheu tom, usa o original como padrão inicial
         if (this.personalTone == null && this.music != null) {
             this.personalTone = this.music.getOriginalTone();
         }

@@ -22,8 +22,6 @@ public class BlockMusicItem {
     @JsonIgnore
     private BlockMusic blockMusic;
 
-    // Agora aponta para a biblioteca do usuário, e não direto para a música global.
-    // Isso garante que vamos ler o 'personalTone' atualizado.
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "idUserMusic", nullable = false)
     private UserMusic userMusic;

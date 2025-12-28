@@ -2,15 +2,13 @@ package com.music.services.impl;
 
 import com.music.model.dto.request.BlockMusicRequestDto;
 import com.music.model.dto.request.MusicToBlockRequest;
+import com.music.model.dto.response.BlockMusicDetailResponse;
 import com.music.model.dto.response.BlockMusicResponseDto;
-import com.music.model.dto.response.MusicResponseDto;
 import com.music.model.entity.BlockMusic;
 import com.music.model.entity.BlockMusicItem;
-import com.music.model.entity.Music;
 import com.music.model.entity.UserMusic;
 import com.music.model.exceptions.blockMusic.BlockMusicIsPresentException;
 import com.music.model.exceptions.blockMusic.BlockMusicNotFoundException;
-import com.music.model.exceptions.music.MusicNotFoundException;
 import com.music.model.mapper.BlockMusicMapper;
 import com.music.model.mapper.MusicMapper;
 import com.music.repositories.BlockMusicRepository;
@@ -50,9 +48,9 @@ public class BlockMusicServiceImpl implements BlockMusicService {
 
     @Override
     @Transactional(readOnly = true)
-    public BlockMusicResponseDto getBlockMusicByIdBlockMusic(Long idBlockMusic) {
+    public BlockMusicDetailResponse getBlockMusicByIdBlockMusic(Long idBlockMusic) {
         BlockMusic blockMusic = validateBlockMusic(idBlockMusic);
-        return blockMusicMapper.toBlockMusicResponseDto(blockMusic);
+        return blockMusicMapper.toBlockMusicDetailResponse(blockMusic);
     }
 
     @Override
@@ -62,6 +60,15 @@ public class BlockMusicServiceImpl implements BlockMusicService {
         if (blockMusicList.isEmpty()) throw new BlockMusicNotFoundException();
 
         return blockMusicMapper.toListBlockMusicResponseDto(blockMusicList);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BlockMusicDetailResponse> getAllBlockMusicDetail(Long idUser) {
+        List<BlockMusic> blockMusicList = blockMusicRepository.findAllBlockMusicByUserIdUser(idUser);
+        if (blockMusicList.isEmpty()) throw new BlockMusicNotFoundException();
+
+        return blockMusicMapper.toListBlockMusicDetailResponse(blockMusicList);
     }
 
     @Override
@@ -84,7 +91,7 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = false)
     public List<BlockMusic> getBlockMusicsByIdBlockMusics(List<Long> idBlockMusics) {
         List<BlockMusic> blockMusics = new ArrayList<>();
         for (Long item : idBlockMusics) {
@@ -96,43 +103,30 @@ public class BlockMusicServiceImpl implements BlockMusicService {
 
     @Override
     @Transactional(readOnly = false)
-    public MusicResponseDto linkMusicToBLock(MusicToBlockRequest musicToBlockRequest) {
-        Music music = musicRepository.findById(musicToBlockRequest.getIdMusic())
-                .orElseThrow(MusicNotFoundException::new);
+    public BlockMusicDetailResponse linkMusicToBLock(MusicToBlockRequest musicToBlockRequest) {
+        UserMusic userMusic = userMusicRepository.findById(musicToBlockRequest.getIdUserMusic())
+                .orElseThrow(() -> new RuntimeException("Música não encontrada na biblioteca (ID: " + musicToBlockRequest.getIdUserMusic() + ")"));
 
-        List<BlockMusic> blockMusicList = getBlockMusicsByIdBlockMusics(musicToBlockRequest.getIdsBlockMusic());
+        BlockMusic blockMusic = validateBlockMusic(musicToBlockRequest.getIdBlockMusic());
 
-        blockMusicList.forEach(blockMusic -> {
-            // Busca o usuário dono do bloco (via Repertoire)
-            var user = blockMusic.getRepertoire().getUser();
+        if (!blockMusic.getRepertoire().getUser().getIdUser().equals(userMusic.getUser().getIdUser())) {
+            throw new RuntimeException("Erro: Tentativa de adicionar música de um usuário em bloco de outro.");
+        }
+
+        boolean exists = blockMusic.getItems().stream()
+                .anyMatch(item -> item.getUserMusic().equals(userMusic));
+
+        if (!exists) {
+            BlockMusicItem newItem = BlockMusicItem.builder()
+                    .blockMusic(blockMusic)
+                    .userMusic(userMusic)
+                    .build();
             
-            // Busca o UserMusic correspondente
-            UserMusic userMusic = userMusicRepository.findByUserAndMusic(user, music)
-                    .orElseThrow(() -> new RuntimeException("Música não encontrada na biblioteca do usuário."));
+            blockMusic.addItem(newItem);
+            blockMusic = blockMusicRepository.save(blockMusic);
+        }
 
-            // Verifica duplicidade
-            boolean exists = blockMusic.getItems().stream()
-                    .anyMatch(item -> item.getUserMusic().equals(userMusic));
-
-            if (!exists) {
-                BlockMusicItem newItem = BlockMusicItem.builder()
-                        .blockMusic(blockMusic)
-                        .userMusic(userMusic)
-                        .build();
-                
-                blockMusic.addItem(newItem);
-                blockMusicRepository.save(blockMusic);
-            }
-        });
-
-        // Conversão manual para MusicResponseDto (Legado)
-        MusicResponseDto response = new MusicResponseDto();
-        response.setIdMusic(music.getIdMusic());
-        response.setNameMusic(music.getNameMusic());
-        response.setSinger(music.getArtist()); // Adaptando artist -> singer
-        // response.setLetterMusic(music.getCipherContent()); // Opcional, dependendo do DTO legado
-        
-        return response;
+        return blockMusicMapper.toBlockMusicDetailResponse(blockMusic);
     }
 
     @Override

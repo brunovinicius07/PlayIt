@@ -2,13 +2,15 @@ package com.music.controllers;
 
 import com.music.model.dto.request.BlockMusicRequestDto;
 import com.music.model.dto.request.MusicToBlockRequest;
+import com.music.model.dto.response.BlockMusicDetailResponse;
 import com.music.model.dto.response.BlockMusicResponseDto;
-import com.music.model.dto.response.MusicResponseDto;
+import com.music.model.entity.User;
 import com.music.services.BlockMusicService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,13 +30,19 @@ public class BlockMusicController {
     }
 
     @GetMapping("getAll/{idUser}")
-    public ResponseEntity<List<BlockMusicResponseDto>> getAllBlockMusic(@PathVariable Long idUser) {
-        var blockMusicResponse = blockMusicService.getAllBlockMusic(idUser);
+    public ResponseEntity<List<BlockMusicResponseDto>> getAllBlockMusic(@AuthenticationPrincipal User user) {
+        var blockMusicResponse = blockMusicService.getAllBlockMusic(user.getIdUser());
+        return ResponseEntity.ok(blockMusicResponse);
+    }
+
+    @GetMapping("getAll/detail/{idUser}")
+    public ResponseEntity<List<BlockMusicDetailResponse>> getAllBlockMusicDetail(@AuthenticationPrincipal User user) {
+        var blockMusicResponse = blockMusicService.getAllBlockMusicDetail(user.getIdUser());
         return ResponseEntity.ok(blockMusicResponse);
     }
 
     @GetMapping("getById/{idBlockMusic}")
-    public ResponseEntity<BlockMusicResponseDto> getBlockMusicByIdBlockMusic(@PathVariable Long idBlockMusic) {
+    public ResponseEntity<BlockMusicDetailResponse> getBlockMusicByIdBlockMusic(@PathVariable Long idBlockMusic) {
         var blockMusicResponse = blockMusicService.getBlockMusicByIdBlockMusic(idBlockMusic);
         return ResponseEntity.ok(blockMusicResponse);
     }
@@ -48,7 +56,7 @@ public class BlockMusicController {
     }
 
     @PutMapping("/link-music-to-block")
-    public ResponseEntity<MusicResponseDto> linkMusicToBLock(@RequestBody
+    public ResponseEntity<BlockMusicDetailResponse> linkMusicToBLock(@RequestBody
                                                              MusicToBlockRequest musicToBlockRequest){
 
         var blockMusicResponse = blockMusicService.linkMusicToBLock(musicToBlockRequest);

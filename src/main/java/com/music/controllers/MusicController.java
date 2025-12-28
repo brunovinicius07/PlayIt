@@ -20,20 +20,20 @@ import java.util.List;
 @RequestMapping(value = "v1/music/musics")
 public class MusicController {
 
-    private final MusicService musicService;
+    private final MusicService service;
 
     @PostMapping("/cipher")
     public ResponseEntity<UserMusicDetailResponse> addMusicFromCipherUrl(
             @RequestBody @Valid AddMusicRequest request,
             @AuthenticationPrincipal User user) {
-        
-        var response = musicService.addMusicFromCipherUrl(request, user);
+
+        var response = service.addMusicFromCipherUrl(request, user);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/library")
     public ResponseEntity<List<UserMusicResponse>> getMyLibrary(@AuthenticationPrincipal User user) {
-        var library = musicService.getAllUserMusics(user.getIdUser());
+        var library = service.getAllUserMusics(user.getIdUser());
         return ResponseEntity.ok(library);
     }
 
@@ -41,8 +41,8 @@ public class MusicController {
     public ResponseEntity<UserMusicDetailResponse> getMusicDetail(
             @PathVariable Long idUserMusic,
             @AuthenticationPrincipal User user) {
-        
-        var detail = musicService.getUserMusicDetail(idUserMusic, user.getIdUser());
+
+        var detail = service.getUserMusicDetail(idUserMusic, user.getIdUser());
         return ResponseEntity.ok(detail);
     }
 
@@ -51,8 +51,8 @@ public class MusicController {
             @PathVariable Long idUserMusic,
             @RequestBody @Valid UpdateToneRequest request,
             @AuthenticationPrincipal User user) {
-        
-        var response = musicService.updatePersonalTone(idUserMusic, request, user.getIdUser());
+
+        var response = service.updatePersonalTone(idUserMusic, request, user.getIdUser());
         return ResponseEntity.ok(response);
     }
 }

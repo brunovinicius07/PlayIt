@@ -13,14 +13,12 @@ import org.mapstruct.Named;
 @Mapper(componentModel = "spring")
 public interface MusicMapper {
 
-    // Mapeamentos para Resumo (Listas)
     @Named("toSummary")
     MusicSummaryResponse toMusicSummaryResponse(Music music);
 
     @Mapping(target = "music", source = "music", qualifiedByName = "toSummary")
     UserMusicResponse toUserMusicResponse(UserMusic userMusic);
 
-    // Mapeamentos para Detalhe (Tela de Ensaio/Visualização)
     @Named("toDetail")
     MusicDetailResponse toMusicDetailResponse(Music music);
 

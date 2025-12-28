@@ -11,9 +11,9 @@ import java.util.List;
 public interface MusicService {
 
     UserMusicDetailResponse addMusicFromCipherUrl(AddMusicRequest request, User user);
-    
+
     UserMusicDetailResponse getUserMusicDetail(Long idUserMusic, Long userId);
-    
+
     List<UserMusicResponse> getAllUserMusics(Long userId);
 
     UserMusicDetailResponse updatePersonalTone(Long idUserMusic, UpdateToneRequest request, Long userId);

@@ -7,35 +7,30 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@FeignClient(
-        name = "schedule-event-service",
-        url = "${SCHEDULE_EVENT_SERVICE_URL}",
-        configuration = FeignAuthConfig.class
-)
+@FeignClient(name = "schedule-event-service", url = "${SCHEDULE_EVENT_SERVICE_URL}", configuration = FeignAuthConfig.class)
 public interface ScheduleEventClient {
 
-    @PostMapping("v1/schedule/event/post")
-    ScheduleEventResponse createEvent(@RequestBody ScheduleEventRequest request);
+        @PostMapping("v1/schedule/event/post")
+        ScheduleEventResponse createEvent(@RequestBody ScheduleEventRequest request);
 
-    @GetMapping("v1/schedule/event/get/{userId}")
-    List<ScheduleEventResponse> getEvents(@PathVariable Long userId);
+        @GetMapping("v1/schedule/event/get")
+        List<ScheduleEventResponse> getEvents();
 
-    @GetMapping("v1/schedule/event/day")
-    List<ScheduleEventResponse> getEventsByUserAndDay(@RequestParam Long userId, @RequestParam String day);
+        @GetMapping("v1/schedule/event/day")
+        List<ScheduleEventResponse> getEventsByUserAndDay(@RequestParam String day);
 
-    @GetMapping("v1/schedule/event/month")
-    List<Integer> getDaysWithEventsInMonth(@RequestParam Long userId, @RequestParam int year,
-                                           @RequestParam int month);
+        @GetMapping("v1/schedule/event/month")
+        List<Integer> getDaysWithEventsInMonth(@RequestParam int year,
+                        @RequestParam int month);
 
-    @GetMapping("v1/schedule/event/range")
-    List<ScheduleEventResponse> getEventsByRange(@RequestParam Long userId, @RequestParam String start,
-                                                 @RequestParam String end
-    );
+        @GetMapping("v1/schedule/event/range")
+        List<ScheduleEventResponse> getEventsByRange(@RequestParam String start,
+                        @RequestParam String end);
 
-    @PutMapping("v1/schedule/event/put/{id}")
-    ScheduleEventResponse updateEvent(@PathVariable String id,
-                                      @RequestBody ScheduleEventRequest request);
+        @PutMapping("v1/schedule/event/put/{id}")
+        ScheduleEventResponse updateEvent(@PathVariable String id,
+                        @RequestBody ScheduleEventRequest request);
 
-    @DeleteMapping("v1/schedule/event/delete/{id}")
-    String deleteEvent(@PathVariable String id);
+        @DeleteMapping("v1/schedule/event/delete/{id}")
+        String deleteEvent(@PathVariable String id);
 }

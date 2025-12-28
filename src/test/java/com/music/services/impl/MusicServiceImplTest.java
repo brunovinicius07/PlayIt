@@ -50,11 +50,9 @@ class MusicServiceImplTest {
 
     @BeforeEach
     void setup() {
-        // Configuração básica de usuário
         user = new User();
         user.setIdUser(1L);
 
-        // Configuração básica de música
         music = Music.builder()
                 .idMusic(100L)
                 .nameMusic("Oceano")
@@ -64,7 +62,6 @@ class MusicServiceImplTest {
                 .cipherContent("<pre>Cifra original</pre>")
                 .build();
 
-        // Configuração de relação Usuário-Música
         userMusic = UserMusic.builder()
                 .idUserMusic(10L)
                 .user(user)
@@ -72,14 +69,12 @@ class MusicServiceImplTest {
                 .personalTone("D")
                 .build();
 
-        // DTO de requisição
         addRequest = new AddMusicRequest();
         addRequest.setUrl("https://www.cifraclub.com.br/djavan/oceano/");
     }
 
     @Test
     void shouldAddMusicFromCipherUrl_WhenMusicIsNew() {
-        // Cenário: Música não existe no banco, precisa fazer Scrape
         String slug = "djavan/oceano";
 
         when(musicRepository.findBySlug(slug)).thenReturn(Optional.empty());
@@ -89,9 +84,8 @@ class MusicServiceImplTest {
         when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.empty());
         when(userMusicRepository.save(any(UserMusic.class))).thenReturn(userMusic);
 
-        // Mock do Mapper retornando um DTO vazio só para não quebrar
         UserMusicDetailResponse responseDto = new UserMusicDetailResponse();
-        responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse()); // Garante que music não é null
+        responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse());
         when(musicMapper.toUserMusicDetailResponse(any(UserMusic.class))).thenReturn(responseDto);
 
         // Execução
@@ -99,14 +93,13 @@ class MusicServiceImplTest {
 
         // Validações
         assertNotNull(result);
-        verify(cipherScraperService).scrapeMusic(addRequest.getUrl(), slug); // Garante que o Scraper foi chamado
-        verify(musicRepository).save(music); // Garante que salvou a música nova
-        verify(userMusicRepository).save(any(UserMusic.class)); // Garante que vinculou ao usuário
+        verify(cipherScraperService).scrapeMusic(addRequest.getUrl(), slug);
+        verify(musicRepository).save(music);
+        verify(userMusicRepository).save(any(UserMusic.class));
     }
 
     @Test
     void shouldAddMusicFromCipherUrl_WhenMusicExists_AndUserAlreadyHasIt() {
-        // Cenário: Música já existe e usuário já tem ela na biblioteca
         String slug = "djavan/oceano";
 
         when(musicRepository.findBySlug(slug)).thenReturn(Optional.of(music));
@@ -116,13 +109,11 @@ class MusicServiceImplTest {
         responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse());
         when(musicMapper.toUserMusicDetailResponse(userMusic)).thenReturn(responseDto);
 
-        // Execução
         UserMusicDetailResponse result = musicService.addMusicFromCipherUrl(addRequest, user);
 
-        // Validações
         assertNotNull(result);
-        verify(cipherScraperService, never()).scrapeMusic(anyString(), anyString()); // NÃO deve fazer scrape
-        verify(userMusicRepository, never()).save(any(UserMusic.class)); // NÃO deve salvar duplicado
+        verify(cipherScraperService, never()).scrapeMusic(anyString(), anyString());
+        verify(userMusicRepository, never()).save(any(UserMusic.class));
     }
 
     @Test
@@ -130,22 +121,18 @@ class MusicServiceImplTest {
         UpdateToneRequest toneRequest = new UpdateToneRequest();
         toneRequest.setNewTone("G");
 
-        // Simula encontrar a UserMusic no banco
         when(userMusicRepository.findById(10L)).thenReturn(Optional.of(userMusic));
 
-        // Simula salvar com o tom atualizado
         when(userMusicRepository.save(any(UserMusic.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UserMusicDetailResponse responseDto = new UserMusicDetailResponse();
         responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse());
         when(musicMapper.toUserMusicDetailResponse(any(UserMusic.class))).thenReturn(responseDto);
 
-        // Execução
         UserMusicDetailResponse result = musicService.updatePersonalTone(10L, toneRequest, user.getIdUser());
 
-        // Validações
         assertNotNull(result);
-        assertEquals("G", userMusic.getPersonalTone()); // Verifica se o objeto foi alterado
+        assertEquals("G", userMusic.getPersonalTone());
         verify(userMusicRepository).save(userMusic);
     }
 
@@ -155,12 +142,11 @@ class MusicServiceImplTest {
         toneRequest.setNewTone("G");
 
         User outroUser = new User();
-        outroUser.setIdUser(99L); // ID Diferente
+        outroUser.setIdUser(99L);
         userMusic.setUser(outroUser);
 
         when(userMusicRepository.findById(10L)).thenReturn(Optional.of(userMusic));
 
-        // Execução e Validação de Erro
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
             musicService.updatePersonalTone(10L, toneRequest, user.getIdUser());
         });
@@ -178,5 +164,77 @@ class MusicServiceImplTest {
 
         assertFalse(result.isEmpty());
         assertEquals(1, result.size());
+    }
+
+    @Test
+    void shouldThrowException_WhenUrlIsInvalid() {
+        AddMusicRequest invalidRequest = new AddMusicRequest();
+        invalidRequest.setUrl("https://not-cifraclub.com/test");
+
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
+            musicService.addMusicFromCipherUrl(invalidRequest, user);
+        });
+
+        assertEquals("Invalid URL. Please ensure it is a valid CifraClub URL.", thrown.getMessage());
+    }
+
+    @Test
+    void shouldAddMusicFromCipherUrl_WhenMusicExists_ButNewToUser() {
+
+        String slug = "djavan/oceano";
+
+        when(musicRepository.findBySlug(slug)).thenReturn(Optional.of(music));
+        when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.empty());
+
+        when(userMusicRepository.save(any(UserMusic.class))).thenReturn(userMusic);
+
+        UserMusicDetailResponse responseDto = new UserMusicDetailResponse();
+        responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse());
+        when(musicMapper.toUserMusicDetailResponse(any(UserMusic.class))).thenReturn(responseDto);
+
+        UserMusicDetailResponse result = musicService.addMusicFromCipherUrl(addRequest, user);
+
+        assertNotNull(result);
+        verify(cipherScraperService, never()).scrapeMusic(anyString(), anyString());
+        verify(userMusicRepository).save(any(UserMusic.class));
+        verify(musicRepository, never()).save(music);
+    }
+
+    @Test
+    void shouldThrowException_WhenUserMusicNotFound_InDetail() {
+        when(userMusicRepository.findById(999L)).thenReturn(Optional.empty());
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
+            musicService.getUserMusicDetail(999L, user.getIdUser());
+        });
+
+        assertEquals("Music not found in library.", thrown.getMessage());
+    }
+
+    @Test
+    void shouldThrowException_WhenUserMusicAccessDenied_InDetail() {
+        User otherUser = new User();
+        otherUser.setIdUser(888L);
+        userMusic.setUser(otherUser);
+
+        when(userMusicRepository.findById(10L)).thenReturn(Optional.of(userMusic));
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
+            musicService.getUserMusicDetail(10L, user.getIdUser());
+        });
+
+        assertEquals("Access denied: This music does not belong to your library.", thrown.getMessage());
+    }
+
+    @Test
+    void shouldGetUserMusicDetail_Success() {
+        when(userMusicRepository.findById(10L)).thenReturn(Optional.of(userMusic));
+        UserMusicDetailResponse responseDto = new UserMusicDetailResponse();
+        responseDto.setMusic(new com.music.model.dto.response.MusicDetailResponse());
+        when(musicMapper.toUserMusicDetailResponse(userMusic)).thenReturn(responseDto);
+
+        UserMusicDetailResponse result = musicService.getUserMusicDetail(10L, user.getIdUser());
+
+        assertNotNull(result);
     }
 }

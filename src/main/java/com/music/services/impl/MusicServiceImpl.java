@@ -19,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -36,15 +34,15 @@ public class MusicServiceImpl implements MusicService {
     @Transactional
     public UserMusicDetailResponse addMusicFromCipherUrl(AddMusicRequest request, User user) {
         String url = request.getUrl();
-        String slug = extractSlugFromUrl(url);
+        String[] parts = extractArtistAndMusicFromUrl(url);
 
-        Optional<Music> existingMusic = musicRepository.findBySlug(slug);
+        Music music = cipherScraperService.findAndScrapeMusic(parts[0], parts[1]);
 
-        Music music;
+        Optional<Music> existingMusic = musicRepository.findBySlug(music.getSlug());
+
         if (existingMusic.isPresent()) {
             music = existingMusic.get();
         } else {
-            music = cipherScraperService.scrapeMusic(url, slug);
             music = musicRepository.save(music);
         }
 
@@ -63,6 +61,20 @@ public class MusicServiceImpl implements MusicService {
         UserMusic savedUserMusic = userMusicRepository.save(newUserMusic);
 
         return buildTransposedResponse(savedUserMusic);
+    }
+
+    private String[] extractArtistAndMusicFromUrl(String url) {
+        // Remove protocolo e www, se houver
+        String cleanUrl = url.replaceAll("https?://(www\\.)?cifraclub\\.com\\.br/", "");
+        if (cleanUrl.endsWith("/"))
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+
+        String[] parts = cleanUrl.split("/");
+        if (parts.length < 2) {
+            throw new IllegalArgumentException("URL inválida. Formato esperado: cifraclub.com.br/artista/musica");
+        }
+
+        return new String[] { parts[0], parts[1] };
     }
 
     @Override
@@ -85,10 +97,10 @@ public class MusicServiceImpl implements MusicService {
     @Transactional
     public UserMusicDetailResponse updatePersonalTone(Long idUserMusic, UpdateToneRequest request, Long userId) {
         UserMusic userMusic = validateUserMusicOwnership(idUserMusic, userId);
-        
+
         userMusic.setPersonalTone(request.getNewTone());
         UserMusic updatedUserMusic = userMusicRepository.save(userMusic);
-        
+
         return buildTransposedResponse(updatedUserMusic);
     }
 
@@ -114,15 +126,5 @@ public class MusicServiceImpl implements MusicService {
         response.getMusic().setCipherContent(transposedCipher);
 
         return response;
-    }
-
-    private String extractSlugFromUrl(String url) {
-        Pattern pattern = Pattern.compile("cifraclub\\.com\\.br/([^/]+/[^/]+)/?");
-        Matcher matcher = pattern.matcher(url);
-
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        throw new IllegalArgumentException("Invalid URL. Please ensure it is a valid CifraClub URL.");
     }
 }

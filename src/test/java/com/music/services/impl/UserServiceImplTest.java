@@ -165,4 +165,12 @@ class UserServiceImplTest {
         assertThrows(UserNotFoundException.class,
                 () -> userService.validateUser(99L));
     }
+
+    @Test
+    void shouldThrowException_WhenUserNotFound_InGetUserById() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class,
+                () -> userService.getUserById(99L));
+    }
 }

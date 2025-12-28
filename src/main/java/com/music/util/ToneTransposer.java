@@ -18,10 +18,10 @@ public class ToneTransposer {
             case "Gb" -> "F#";
             case "Ab" -> "G#";
             case "Bb" -> "A#";
-            case "Cb" -> "B"; // Exceção teórica
-            case "E#" -> "F"; // Exceção teórica
-            case "B#" -> "C"; // Exceção teórica
-            case "Fb" -> "E"; // Exceção teórica
+            case "Cb" -> "B";
+            case "E#" -> "F";
+            case "B#" -> "C";
+            case "Fb" -> "E";
             default -> note;
         };
     }
@@ -29,7 +29,6 @@ public class ToneTransposer {
     public static String transpose(String cipherContent, String fromTone, String toTone) {
         if (cipherContent == null || fromTone == null || toTone == null) return cipherContent;
         
-        // Normaliza os tons de origem e destino para garantir que estão na escala
         String rootFrom = normalizeNote(fromTone);
         String rootTo = normalizeNote(toTone);
         
@@ -41,17 +40,6 @@ public class ToneTransposer {
         if (indexFrom == -1 || indexTo == -1) return cipherContent; 
 
         int semitones = indexTo - indexFrom;
-
-        // Regex aprimorado:
-        // Procura por notas (A-G) seguidas opcionalmente de # ou b.
-        // O lookahead (?=...) e lookbehind (?<=...) podem ser usados se quisermos garantir que está dentro de tags <b>
-        // Mas como o CifraClub usa <b>C</b>, o regex simples funciona se aplicarmos sobre o texto todo, 
-        // desde que tenhamos cuidado para não substituir texto comum.
-        // O padrão do CifraClub geralmente isola os acordes em tags <b>.
-        // Vamos tentar capturar o conteúdo dentro de <b>...</b> para ser mais seguro.
-        
-        // Estratégia: Encontrar tags <b> e processar apenas o conteúdo delas.
-        // Regex para encontrar tags <b>: <b>(.*?)</b>
         
         StringBuffer result = new StringBuffer();
         Pattern tagPattern = Pattern.compile("<b>(.*?)</b>");
@@ -68,10 +56,7 @@ public class ToneTransposer {
     }
 
     private static String transposeChordString(String chord, int semitones) {
-        // Dentro da tag <b> pode ter algo como "C#m7" ou "G/B"
-        // Vamos substituir cada nota encontrada.
         StringBuffer sb = new StringBuffer();
-        // Regex para nota: [A-G] seguido opcionalmente de # ou b
         Pattern notePattern = Pattern.compile("[A-G](#|b)?");
         Matcher noteMatcher = notePattern.matcher(chord);
 

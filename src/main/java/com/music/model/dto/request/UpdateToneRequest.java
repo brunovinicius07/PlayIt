@@ -8,7 +8,7 @@ import lombok.Data;
 public class UpdateToneRequest {
 
     @NotBlank(message = "The tone cannot be empty.")
-    // Regex opcional para validar tons (ex: C, C#, Db, etc)
+
     @Pattern(regexp = "^[A-G](#|b)?$", message = "Invalid tone format. Use C, C#, Db, etc.")
     private String newTone;
 }
