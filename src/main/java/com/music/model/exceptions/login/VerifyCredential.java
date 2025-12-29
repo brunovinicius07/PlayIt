@@ -5,7 +5,12 @@ import org.springframework.http.HttpStatus;
 
 public class VerifyCredential extends AlertException {
     private static final String DEFAULT_MESSAGE = "Email ou senha inválidos!";
+
     public VerifyCredential() {
         super("401", DEFAULT_MESSAGE, HttpStatus.UNAUTHORIZED);
+    }
+
+    public VerifyCredential(String message) {
+        super("401", message, HttpStatus.UNAUTHORIZED);
     }
 }

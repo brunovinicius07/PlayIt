@@ -78,7 +78,7 @@ class MusicServiceImplTest {
         String slug = "djavan/oceano";
 
         when(musicRepository.findBySlug(slug)).thenReturn(Optional.empty());
-        when(cipherScraperService.scrapeMusic(addRequest.getUrl(), slug)).thenReturn(music);
+        when(cipherScraperService.findAndScrapeMusic("djavan", "oceano")).thenReturn(music);
         when(musicRepository.save(music)).thenReturn(music);
 
         when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.empty());
@@ -93,7 +93,7 @@ class MusicServiceImplTest {
 
         // Validações
         assertNotNull(result);
-        verify(cipherScraperService).scrapeMusic(addRequest.getUrl(), slug);
+        verify(cipherScraperService).findAndScrapeMusic("djavan", "oceano");
         verify(musicRepository).save(music);
         verify(userMusicRepository).save(any(UserMusic.class));
     }
@@ -102,6 +102,7 @@ class MusicServiceImplTest {
     void shouldAddMusicFromCipherUrl_WhenMusicExists_AndUserAlreadyHasIt() {
         String slug = "djavan/oceano";
 
+        when(cipherScraperService.findAndScrapeMusic("djavan", "oceano")).thenReturn(music);
         when(musicRepository.findBySlug(slug)).thenReturn(Optional.of(music));
         when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.of(userMusic));
 
@@ -112,7 +113,7 @@ class MusicServiceImplTest {
         UserMusicDetailResponse result = musicService.addMusicFromCipherUrl(addRequest, user);
 
         assertNotNull(result);
-        verify(cipherScraperService, never()).scrapeMusic(anyString(), anyString());
+        verify(cipherScraperService).findAndScrapeMusic("djavan", "oceano");
         verify(userMusicRepository, never()).save(any(UserMusic.class));
     }
 
@@ -175,7 +176,7 @@ class MusicServiceImplTest {
             musicService.addMusicFromCipherUrl(invalidRequest, user);
         });
 
-        assertEquals("Invalid URL. Please ensure it is a valid CifraClub URL.", thrown.getMessage());
+        assertEquals("URL inválida. Formato esperado: cifraclub.com.br/artista/musica", thrown.getMessage());
     }
 
     @Test
@@ -183,6 +184,7 @@ class MusicServiceImplTest {
 
         String slug = "djavan/oceano";
 
+        when(cipherScraperService.findAndScrapeMusic("djavan", "oceano")).thenReturn(music);
         when(musicRepository.findBySlug(slug)).thenReturn(Optional.of(music));
         when(userMusicRepository.findByUserAndMusic(user, music)).thenReturn(Optional.empty());
 
@@ -195,7 +197,7 @@ class MusicServiceImplTest {
         UserMusicDetailResponse result = musicService.addMusicFromCipherUrl(addRequest, user);
 
         assertNotNull(result);
-        verify(cipherScraperService, never()).scrapeMusic(anyString(), anyString());
+        verify(cipherScraperService).findAndScrapeMusic("djavan", "oceano");
         verify(userMusicRepository).save(any(UserMusic.class));
         verify(musicRepository, never()).save(music);
     }
@@ -236,5 +238,14 @@ class MusicServiceImplTest {
         UserMusicDetailResponse result = musicService.getUserMusicDetail(10L, user.getIdUser());
 
         assertNotNull(result);
+    }
+
+    @Test
+    void shouldDeleteMusicFromLibrary_Success() {
+        when(userMusicRepository.findById(10L)).thenReturn(Optional.of(userMusic));
+
+        musicService.deleteMusicFromLibrary(10L, user.getIdUser());
+
+        verify(userMusicRepository).delete(userMusic);
     }
 }

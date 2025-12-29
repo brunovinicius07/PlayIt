@@ -15,8 +15,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+
 import java.util.Date;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -42,15 +41,13 @@ public class TokenService {
                 "roles", userDetails.getAuthorities()
                         .stream()
                         .map(GrantedAuthority::getAuthority)
-                        .collect(Collectors.toList())
-        );
+                        .collect(Collectors.toList()));
         return buildToken(claims, userDetails);
     }
 
-    public String generateTokenToChangePassword(User user, long timeExpirationToChangePassword) {
-        Date expirationTime = Date.from(LocalDateTime.now()
-                .plusMinutes(timeExpirationToChangePassword)
-                .toInstant(ZoneOffset.of("-03:00")));
+    public String generateResetToken(User user) {
+        Date expirationTime = Date.from(java.time.Instant.now()
+                .plus(5, java.time.temporal.ChronoUnit.MINUTES));
 
         return Jwts.builder()
                 .setSubject(user.getEmail())
@@ -85,9 +82,8 @@ public class TokenService {
     }
 
     private String buildToken(Map<String, Object> claims, UserDetails userDetails) {
-        Date expirationTime = Date.from(LocalDateTime.now()
-                .plusHours(timeExpirationToken)
-                .toInstant(ZoneOffset.of("-03:00")));
+        Date expirationTime = Date.from(java.time.Instant.now()
+                .plus(java.time.Duration.ofHours(timeExpirationToken)));
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -113,8 +109,7 @@ public class TokenService {
             throw new AlertException(
                     "JWT_INVALID",
                     "Token inválido ou expirado",
-                    HttpStatus.UNAUTHORIZED
-            );
+                    HttpStatus.UNAUTHORIZED);
         }
     }
 

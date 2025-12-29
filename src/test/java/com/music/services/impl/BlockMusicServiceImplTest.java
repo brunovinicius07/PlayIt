@@ -233,4 +233,19 @@ class BlockMusicServiceImplTest {
         assertNotNull(result);
         verify(blockMusicRepository, never()).save(blockMusic);
     }
+
+    @Test
+    void removeMusicFromBlock_Success() {
+        // Find item to remove
+        BlockMusicItem itemToRemove = new BlockMusicItem();
+        itemToRemove.setUserMusic(userMusic);
+        blockMusic.setItems(new ArrayList<>(List.of(itemToRemove)));
+
+        when(blockMusicRepository.findById(1L)).thenReturn(Optional.of(blockMusic));
+
+        blockMusicService.removeMusicFromBlock(1L, 10L); // 1L = Block, 10L = UserMusic
+
+        assertTrue(blockMusic.getItems().isEmpty());
+        verify(blockMusicRepository).save(blockMusic);
+    }
 }

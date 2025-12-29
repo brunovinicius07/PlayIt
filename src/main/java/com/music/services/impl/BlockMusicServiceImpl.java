@@ -38,7 +38,7 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     @Override
     @Transactional(readOnly = false)
     public BlockMusicResponseDto createBlockMusic(BlockMusicRequestDto blockMusicRequestDto) {
-        existingBlockMusic(blockMusicRequestDto.getNameBlockMusic(),blockMusicRequestDto.getIdRepertoire());
+        existingBlockMusic(blockMusicRequestDto.getNameBlockMusic(), blockMusicRequestDto.getIdRepertoire());
         BlockMusic blockMusic = blockMusicMapper.toBlockMusic(blockMusicRequestDto);
         var repertoire = repertoireService.validateRepertoire(blockMusicRequestDto.getIdRepertoire());
         blockMusic.setRepertoire(repertoire);
@@ -57,7 +57,8 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     @Transactional(readOnly = true)
     public List<BlockMusicResponseDto> getAllBlockMusic(Long idUser) {
         List<BlockMusic> blockMusicList = blockMusicRepository.findAllBlockMusicByUserIdUser(idUser);
-        if (blockMusicList.isEmpty()) throw new BlockMusicNotFoundException();
+        if (blockMusicList.isEmpty())
+            throw new BlockMusicNotFoundException();
 
         return blockMusicMapper.toListBlockMusicResponseDto(blockMusicList);
     }
@@ -66,7 +67,8 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     @Transactional(readOnly = true)
     public List<BlockMusicDetailResponse> getAllBlockMusicDetail(Long idUser) {
         List<BlockMusic> blockMusicList = blockMusicRepository.findAllBlockMusicByUserIdUser(idUser);
-        if (blockMusicList.isEmpty()) throw new BlockMusicNotFoundException();
+        if (blockMusicList.isEmpty())
+            throw new BlockMusicNotFoundException();
 
         return blockMusicMapper.toListBlockMusicDetailResponse(blockMusicList);
     }
@@ -74,10 +76,11 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     @Override
     @Transactional(readOnly = false)
     public BlockMusicResponseDto updateBlockMusic(Long idBlockMusic, BlockMusicRequestDto blockMusicRequestDto) {
-        existingBlockMusic(blockMusicRequestDto.getNameBlockMusic(),blockMusicRequestDto.getIdRepertoire());
+        existingBlockMusic(blockMusicRequestDto.getNameBlockMusic(), blockMusicRequestDto.getIdRepertoire());
         BlockMusic blockMusic = validateBlockMusic(idBlockMusic);
         blockMusic.setNameBlockMusic(blockMusicRequestDto.getNameBlockMusic() != null
-                ? blockMusicRequestDto.getNameBlockMusic() : blockMusic.getNameBlockMusic());
+                ? blockMusicRequestDto.getNameBlockMusic()
+                : blockMusic.getNameBlockMusic());
 
         return blockMusicMapper.toBlockMusicResponseDto(blockMusicRepository.save(blockMusic));
     }
@@ -105,7 +108,8 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     @Transactional(readOnly = false)
     public BlockMusicDetailResponse linkMusicToBLock(MusicToBlockRequest musicToBlockRequest) {
         UserMusic userMusic = userMusicRepository.findById(musicToBlockRequest.getIdUserMusic())
-                .orElseThrow(() -> new RuntimeException("Música não encontrada na biblioteca (ID: " + musicToBlockRequest.getIdUserMusic() + ")"));
+                .orElseThrow(() -> new RuntimeException(
+                        "Música não encontrada na biblioteca (ID: " + musicToBlockRequest.getIdUserMusic() + ")"));
 
         BlockMusic blockMusic = validateBlockMusic(musicToBlockRequest.getIdBlockMusic());
 
@@ -121,7 +125,7 @@ public class BlockMusicServiceImpl implements BlockMusicService {
                     .blockMusic(blockMusic)
                     .userMusic(userMusic)
                     .build();
-            
+
             blockMusic.addItem(newItem);
             blockMusic = blockMusicRepository.save(blockMusic);
         }
@@ -130,10 +134,21 @@ public class BlockMusicServiceImpl implements BlockMusicService {
     }
 
     @Override
+    @Transactional(readOnly = false)
+    public void removeMusicFromBlock(Long idBlockMusic, Long idUserMusic) {
+        BlockMusic blockMusic = validateBlockMusic(idBlockMusic);
+
+        blockMusic.getItems().removeIf(item -> item.getUserMusic().getIdUserMusic().equals(idUserMusic));
+
+        blockMusicRepository.save(blockMusic);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public void existingBlockMusic(String nameBlockMusic, Long idUser) {
         blockMusicRepository.findBlockMusicByNameBlockMusicAndRepertoireIdRepertoire(nameBlockMusic, idUser)
-                .ifPresent(blockMusic -> {throw new BlockMusicIsPresentException();
+                .ifPresent(blockMusic -> {
+                    throw new BlockMusicIsPresentException();
                 });
     }
 

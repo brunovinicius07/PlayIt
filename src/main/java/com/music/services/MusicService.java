@@ -17,4 +17,6 @@ public interface MusicService {
     List<UserMusicResponse> getAllUserMusics(Long userId);
 
     UserMusicDetailResponse updatePersonalTone(Long idUserMusic, UpdateToneRequest request, Long userId);
+
+    void deleteMusicFromLibrary(Long idUserMusic, Long userId);
 }

@@ -34,6 +34,13 @@ public class User implements UserDetails {
 
     private String email;
 
+    @Column(columnDefinition = "boolean default false")
+    private boolean enabled = false;
+
+    private String verificationCode;
+
+    private java.time.LocalDateTime verificationCodeExpiration;
+
     @JsonIgnore
     private String password;
 
@@ -56,8 +63,7 @@ public class User implements UserDetails {
             case ADMIN -> List.of(
                     new SimpleGrantedAuthority("ROLE_ADMIN"),
                     new SimpleGrantedAuthority("ROLE_USER_FULL"),
-                    new SimpleGrantedAuthority("ROLE_USER")
-            );
+                    new SimpleGrantedAuthority("ROLE_USER"));
             case USER_FULL -> List.of(
                     new SimpleGrantedAuthority("ROLE_USER_FULL"),
                     new SimpleGrantedAuthority("ROLE_USER"));
@@ -92,13 +98,15 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return this.enabled;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof User other)) return false;
+        if (this == o)
+            return true;
+        if (!(o instanceof User other))
+            return false;
         return idUser != null && idUser.equals(other.getIdUser());
     }
 

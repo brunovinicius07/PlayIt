@@ -55,4 +55,13 @@ public class MusicController {
         var response = service.updatePersonalTone(idUserMusic, request, user.getIdUser());
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping("/library/{idUserMusic}")
+    public ResponseEntity<Void> deleteMusicFromLibrary(
+            @PathVariable Long idUserMusic,
+            @AuthenticationPrincipal User user) {
+
+        service.deleteMusicFromLibrary(idUserMusic, user.getIdUser());
+        return ResponseEntity.noContent().build();
+    }
 }

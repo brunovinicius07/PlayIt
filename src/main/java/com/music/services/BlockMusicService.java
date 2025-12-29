@@ -26,6 +26,8 @@ public interface BlockMusicService {
 
     BlockMusicDetailResponse linkMusicToBLock(MusicToBlockRequest musicToBlockRequest);
 
+    void removeMusicFromBlock(Long idBlockMusic, Long idUserMusic);
+
     void existingBlockMusic(String nameBlockMusic, Long idUser);
 
     BlockMusic validateBlockMusic(Long idBlockMusic);
