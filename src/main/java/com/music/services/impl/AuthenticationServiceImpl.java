@@ -8,7 +8,8 @@ import com.music.model.dto.request.RegisterRequest;
 import com.music.model.dto.request.ResetPasswordRequest;
 import com.music.model.dto.response.AuthenticationResponse;
 import com.music.model.entity.User;
-import com.music.model.event.ForgotPasswordEvent;
+import com.music.model.enums.EmailType;
+import com.music.model.event.EmailRequestEvent;
 import com.music.model.exceptions.login.EmailPresentException;
 import com.music.model.exceptions.login.VerifyCredential;
 import com.music.model.exceptions.password.NewPasswordNoMatchException;
@@ -30,6 +31,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
@@ -42,42 +46,65 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final KafkaProducerService producer;
 
     @Value("${api.security.token.timeExpirationToChangePassword}")
-    private long timeExpirationToChangePassword;
+    private long expirationTime;
 
     @Override
     @Transactional(readOnly = false)
     public AuthenticationResponse register(RegisterRequest request) {
-        try {
-            if (request.getPassword().equals(request.getConfirmNewPassword())){
-                existingUser(request.getEmail());
-
-                User user = this.userMapper.registerDtoToUser(request);
-                user.setPassword(this.passwordEncoder.encode(user.getPassword()));
-                user.setRole(UserRole.ADMIN);
-
-                userRepository.save(user);
-
-                String token = tokenService.generateToken(user);
-                AuthenticationResponse authenticationResponse = userMapper.userToAuthenticationResponse(user);
-                authenticationResponse.setToken(token);
-
-                return authenticationResponse;
-            }else throw new PasswordNoMatchException();
-        }catch (BadCredentialsException e){
-            throw new EmailPresentException();
+        if (!request.getPassword().equals(request.getConfirmNewPassword())) {
+            throw new PasswordNoMatchException();
         }
+
+        User user;
+        var optionalUser = userRepository.findByEmail(request.getEmail());
+
+        if (optionalUser.isPresent()) {
+            User existing = optionalUser.get();
+            if (existing.isEnabled()) {
+                throw new EmailPresentException();
+            }
+            user = existing;
+            user.setNameUser(request.getNameUser());
+            user.setPassword(this.passwordEncoder.encode(request.getPassword()));
+            user.setRole(UserRole.ADMIN);
+        } else {
+            user = this.userMapper.registerDtoToUser(request);
+            user.setPassword(this.passwordEncoder.encode(user.getPassword()));
+            user.setRole(UserRole.ADMIN);
+        }
+
+        String code = String.valueOf(new SecureRandom().nextInt(900000) + 100000);
+        user.setVerificationCode(code);
+        user.setVerificationCodeExpiration(
+                java.time.LocalDateTime.now().plusMinutes(expirationTime));
+        user.setEnabled(false);
+
+        userRepository.save(user);
+
+        EmailRequestEvent event = new EmailRequestEvent(
+                user.getEmail(),
+                "Código de Verificação",
+                EmailType.VERIFICATION_CODE,
+                Map.of("name", user.getNameUser(),
+                        "code", code,
+                        "expiration", expirationTime + " minutos"));
+        producer.sendEmailEvent(event);
+
+        String token = tokenService.generateToken(user);
+        AuthenticationResponse authenticationResponse = userMapper.userToAuthenticationResponse(user);
+        authenticationResponse.setToken(token);
+
+        return authenticationResponse;
     }
 
     @Override
     @Transactional(readOnly = true)
     public AuthenticationResponse login(AuthenticationRequest request) {
         try {
-           Authentication authentication = authenticationManager.authenticate(
+            Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getEmail(),
-                            request.getPassword()
-                    )
-            );
+                            request.getPassword()));
 
             User user = (User) authentication.getPrincipal();
 
@@ -86,7 +113,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             authResponse.setToken(token);
 
             return authResponse;
-        }catch (BadCredentialsException e){
+        } catch (BadCredentialsException e) {
             throw new VerifyCredential();
         }
     }
@@ -98,14 +125,16 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 + " estiver cadastrado, enviaremos instruções para redefinir sua senha.";
 
         userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
-            String token = tokenService.generateTokenToChangePassword(user, timeExpirationToChangePassword);
+            String token = tokenService.generateResetToken(user);
 
-            ForgotPasswordEvent event = new ForgotPasswordEvent(
+            EmailRequestEvent event = new EmailRequestEvent(
                     user.getEmail(),
-                    user.getNameUser(),
-                    token
-            );
-            producer.sendForgotPasswordEvent(event);
+                    "Redefinição de Senha",
+                    EmailType.FORGOT_PASSWORD,
+                    Map.of("name", user.getNameUser(),
+                            "token", token,
+                            "expiration", "5 minutos"));
+            producer.sendEmailEvent(event);
         });
 
         return message;
@@ -121,17 +150,66 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         String email = tokenService.extractUsername(request.getToken());
         User user = userRepository.findByEmail(email).orElseThrow(EmailNotFoundException::new);
 
-        if(request.getNewPassword().equals(request.getConfirmNewPassword())){
+        if (request.getNewPassword().equals(request.getConfirmNewPassword())) {
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
             userRepository.save(user);
-        } else throw new NewPasswordNoMatchException();
+        } else
+            throw new NewPasswordNoMatchException();
 
         return "Senha redefinida com sucesso, faça login!";
     }
 
     @Override
+    @Transactional(readOnly = false)
+    public String verifyEmail(String email, String code) {
+        User user = userRepository.findByEmail(email).orElseThrow(EmailNotFoundException::new);
+
+        if (user.getVerificationCode() != null && user.getVerificationCode().equals(code)) {
+            if (user.getVerificationCodeExpiration() != null
+                    && java.time.LocalDateTime.now().isAfter(user.getVerificationCodeExpiration())) {
+                throw new VerifyCredential("Código de verificação expirado.");
+            }
+            user.setEnabled(true);
+            user.setVerificationCode(null);
+            user.setVerificationCodeExpiration(null);
+            userRepository.save(user);
+            return "E-mail verificado com sucesso!";
+        } else {
+            throw new VerifyCredential("Código de verificação inválido.");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = false)
+    public String resendVerificationCode(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(EmailNotFoundException::new);
+
+        if (user.isEnabled()) {
+            return "Este usuário já está ativado.";
+        }
+
+        String code = String.valueOf(new SecureRandom().nextInt(900000) + 100000);
+        user.setVerificationCode(code);
+        user.setVerificationCodeExpiration(
+                java.time.LocalDateTime.now().plusMinutes(expirationTime));
+
+        userRepository.save(user);
+
+        EmailRequestEvent event = new EmailRequestEvent(
+                user.getEmail(),
+                "Reenvio de Código de Verificação",
+                EmailType.VERIFICATION_CODE,
+                Map.of("name", user.getNameUser(),
+                        "code", code,
+                        "expiration", expirationTime + " minutos"));
+        producer.sendEmailEvent(event);
+
+        return "Novo código enviado com sucesso!";
+    }
+
+    @Override
     @Transactional(readOnly = true)
-    public void existingUser(String email){
+    public void existingUser(String email) {
         userRepository.findByEmail(email).ifPresent(verify -> {
             throw new EmailPresentException();
         });

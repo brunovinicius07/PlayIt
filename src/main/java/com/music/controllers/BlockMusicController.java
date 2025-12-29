@@ -49,15 +49,14 @@ public class BlockMusicController {
 
     @PutMapping("/put/{idBlockMusic}")
     public ResponseEntity<BlockMusicResponseDto> updateBlockMusic(@PathVariable Long idBlockMusic,
-                                                                  @RequestBody @Valid
-                                                              BlockMusicRequestDto blockMusicRequestDto) {
-        var blockMusicResponse = blockMusicService.updateBlockMusic(idBlockMusic,blockMusicRequestDto);
+            @RequestBody @Valid BlockMusicRequestDto blockMusicRequestDto) {
+        var blockMusicResponse = blockMusicService.updateBlockMusic(idBlockMusic, blockMusicRequestDto);
         return ResponseEntity.ok(blockMusicResponse);
     }
 
     @PutMapping("/link-music-to-block")
-    public ResponseEntity<BlockMusicDetailResponse> linkMusicToBLock(@RequestBody
-                                                             MusicToBlockRequest musicToBlockRequest){
+    public ResponseEntity<BlockMusicDetailResponse> linkMusicToBLock(
+            @RequestBody MusicToBlockRequest musicToBlockRequest) {
 
         var blockMusicResponse = blockMusicService.linkMusicToBLock(musicToBlockRequest);
         return ResponseEntity.ok(blockMusicResponse);
@@ -67,5 +66,14 @@ public class BlockMusicController {
     public ResponseEntity<String> deleteBlockMusic(@PathVariable Long idBlockMusic) {
         String message = blockMusicService.deleteBlockMusic(idBlockMusic);
         return ResponseEntity.ok(message);
+    }
+
+    @DeleteMapping("/{idBlockMusic}/remove-music/{idUserMusic}")
+    public ResponseEntity<Void> removeMusicFromBlock(
+            @PathVariable Long idBlockMusic,
+            @PathVariable Long idUserMusic) {
+
+        blockMusicService.removeMusicFromBlock(idBlockMusic, idUserMusic);
+        return ResponseEntity.noContent().build();
     }
 }

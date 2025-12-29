@@ -14,9 +14,13 @@ public interface AuthenticationService {
 
     AuthenticationResponse login(AuthenticationRequest request);
 
-    String forgotPassword(ForgotPasswordRequest forgotPasswordRequest);
+    String forgotPassword(ForgotPasswordRequest request);
 
-    String resetPassword(@Valid ResetPasswordRequest request);
+    String resetPassword(ResetPasswordRequest request);
+
+    String verifyEmail(String email, String code);
+
+    String resendVerificationCode(String email);
 
     void existingUser(String email);
 

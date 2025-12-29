@@ -40,7 +40,9 @@ public class SecurityConfig {
                                                                 antMatcher("/v1/music/auth/register"),
                                                                 antMatcher("/v1/music/auth/login"),
                                                                 antMatcher("/v1/music/auth/forgotPassword"),
-                                                                antMatcher("/v1/music/auth/resetPassword"))
+                                                                antMatcher("/v1/music/auth/resetPassword"),
+                                                                antMatcher("/v1/music/auth/resend-code"),
+                                                                antMatcher("/v1/music/auth/verify"))
                                                 .permitAll()
 
                                                 .requestMatchers(

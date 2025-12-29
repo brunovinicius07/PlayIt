@@ -32,7 +32,7 @@ public class AuthenticationController {
     }
 
     @PutMapping("/forgotPassword")
-    public ResponseEntity<String> forgotPassword(@RequestBody @Valid ForgotPasswordRequest forgotPasswordRequest){
+    public ResponseEntity<String> forgotPassword(@RequestBody @Valid ForgotPasswordRequest forgotPasswordRequest) {
         var message = service.forgotPassword(forgotPasswordRequest);
         return ResponseEntity.ok(message);
     }
@@ -40,6 +40,18 @@ public class AuthenticationController {
     @PutMapping("/resetPassword")
     public ResponseEntity<String> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
         var message = service.resetPassword(request);
+        return ResponseEntity.ok(message);
+    }
+
+    @PostMapping("/verify")
+    public ResponseEntity<String> verifyEmail(@RequestParam String email, @RequestParam String code) {
+        var message = service.verifyEmail(email, code);
+        return ResponseEntity.ok(message);
+    }
+
+    @PostMapping("/resend-code")
+    public ResponseEntity<String> resendVerificationCode(@RequestParam String email) {
+        var message = service.resendVerificationCode(email);
         return ResponseEntity.ok(message);
     }
 

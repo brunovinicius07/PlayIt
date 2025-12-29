@@ -64,7 +64,9 @@ public class MusicServiceImpl implements MusicService {
     }
 
     private String[] extractArtistAndMusicFromUrl(String url) {
-        // Remove protocolo e www, se houver
+        if (!url.contains("cifraclub.com.br")) {
+            throw new IllegalArgumentException("URL inválida. Formato esperado: cifraclub.com.br/artista/musica");
+        }
         String cleanUrl = url.replaceAll("https?://(www\\.)?cifraclub\\.com\\.br/", "");
         if (cleanUrl.endsWith("/"))
             cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
@@ -102,6 +104,13 @@ public class MusicServiceImpl implements MusicService {
         UserMusic updatedUserMusic = userMusicRepository.save(userMusic);
 
         return buildTransposedResponse(updatedUserMusic);
+    }
+
+    @Override
+    @Transactional
+    public void deleteMusicFromLibrary(Long idUserMusic, Long userId) {
+        UserMusic userMusic = validateUserMusicOwnership(idUserMusic, userId);
+        userMusicRepository.delete(userMusic);
     }
 
     private UserMusic validateUserMusicOwnership(Long idUserMusic, Long userId) {
